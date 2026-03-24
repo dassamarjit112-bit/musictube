@@ -1,4 +1,4 @@
-const BASE = "http://localhost:5000/api";
+const BASE = "/api";
 
 export interface Song {
   type: "song" | "video";
