@@ -27,7 +27,6 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [session, setSession] = useState<any>(null);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
@@ -44,7 +43,6 @@ function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [showMobilePlayer, setShowMobilePlayer] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]); // list of videoIds
-  const [history, setHistory] = useState<Song[]>([]);
   const [activeChip, setActiveChip] = useState<string | null>(null);
 
   const currentSongRef = useRef(currentSong);
@@ -120,16 +118,13 @@ function App() {
   // Supabase Auth Listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchFavorites(session.user.id);
-        fetchHistory(session.user.id);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
       setUser(session?.user ?? null);
     });
 
@@ -151,12 +146,6 @@ function App() {
   const fetchFavorites = async (userId: string) => {
     const { data } = await supabase.from('favorites').select('item_id').eq('user_id', userId);
     if (data) setFavorites(data.map(f => f.item_id));
-  };
-
-  const fetchHistory = async (userId: string) => {
-    const { data } = await supabase.from('history').select('*').eq('user_id', userId).order('played_at', { ascending: false }).limit(20);
-    // mapping logic for song format
-    if (data) setHistory(data as any);
   };
 
   const logHistory = async (song: Song) => {
@@ -309,13 +298,6 @@ function App() {
 
   const handleChipClick = async (chip: string) => {
     setActiveChip(chip);
-    const categoryMap: Record<string, string> = {
-      "Energize": "Energize",
-      "Relax": "Relax",
-      "Workout": "Workout",
-      "Commute": "Commute",
-      "Focus": "Focus"
-    };
     try {
       // Mocking discovery path
       const res = await api.search(chip + " songs");
