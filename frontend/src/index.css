@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #030303;
+  --bg-secondary: #0f0f0f;
+  --bg-hover: #1f1f1f;
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+  --accent: #f00; /* YT Music Red variant */
+  --header-height: 64px;
+  --sidebar-width: 240px;
+  --player-height: 72px;
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  overflow: hidden; /* Main window doesn't scroll, inner container does */
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3e3e3e;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5e5e5e;
+}
+
+/* Utilities */
+.yt-glass {
+  background: rgba(3, 3, 3, 0.8);
+  backdrop-filter: blur(20px);
+}
