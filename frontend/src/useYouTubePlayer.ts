@@ -1,8 +1,8 @@
 /**
  * useYouTubePlayer – wraps the YouTube IFrame API directly.
- * react-player v3 dropped YouTube support, so we use the raw YT API.
+ * Improved for stability and control responsive-ness.
  */
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 
 declare global {
   interface Window {
@@ -41,7 +41,10 @@ export function useYouTubePlayer(
   options: YTPlayerOptions
 ) {
   const playerRef = useRef<any>(null);
+  const isReadyRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  
+  // Keep options stable in refs so player events can always access latest callbacks
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
@@ -56,7 +59,7 @@ export function useYouTubePlayer(
     stopProgress();
     intervalRef.current = setInterval(() => {
       const p = playerRef.current;
-      if (!p || typeof p.getCurrentTime !== "function") return;
+      if (!p || !isReadyRef.current || typeof p.getCurrentTime !== "function") return;
       try {
         const cur = p.getCurrentTime();
         const dur = p.getDuration();
@@ -73,13 +76,22 @@ export function useYouTubePlayer(
       const container = document.getElementById(containerId);
       if (!container) return;
 
-      if (playerRef.current) {
+      // If player exists but not same video, or just needs a load
+      if (playerRef.current && isReadyRef.current) {
         try {
           playerRef.current.loadVideoById(videoId);
           return;
-        } catch {}
+        } catch (e) {
+          console.error("Failed to load video by id, re-creating player", e);
+        }
       }
 
+      // Destroy old instance if any
+      if (playerRef.current) {
+        try { playerRef.current.destroy(); } catch {}
+      }
+
+      isReadyRef.current = false;
       playerRef.current = new window.YT.Player(containerId, {
         videoId,
         playerVars: {
@@ -88,9 +100,12 @@ export function useYouTubePlayer(
           modestbranding: 1,
           rel: 0,
           origin: window.location.origin,
+          iv_load_policy: 3,
+          enablejsapi: 1,
         },
         events: {
           onReady: () => {
+            isReadyRef.current = true;
             optionsRef.current.onReady?.();
           },
           onStateChange: (e: any) => {
@@ -118,6 +133,9 @@ export function useYouTubePlayer(
     loadYTApi();
     return () => {
       stopProgress();
+      if (playerRef.current) {
+        try { playerRef.current.destroy(); } catch {}
+      }
     };
   }, [stopProgress]);
 
@@ -134,15 +152,18 @@ export function useYouTubePlayer(
   );
 
   const play = useCallback(() => {
+    if (!isReadyRef.current) return;
     try { playerRef.current?.playVideo(); } catch {}
   }, []);
 
   const pause = useCallback(() => {
+    if (!isReadyRef.current) return;
     try { playerRef.current?.pauseVideo(); } catch {}
     stopProgress();
   }, [stopProgress]);
 
   const seekTo = useCallback((fraction: number) => {
+    if (!isReadyRef.current) return;
     const p = playerRef.current;
     if (!p || typeof p.getDuration !== "function") return;
     try {
@@ -152,14 +173,12 @@ export function useYouTubePlayer(
   }, []);
 
   const setVolume = useCallback((vol: number) => {
+    if (!isReadyRef.current) return;
     try { playerRef.current?.setVolume(vol * 100); } catch {}
   }, []);
 
-  const destroy = useCallback(() => {
-    stopProgress();
-    try { playerRef.current?.destroy(); } catch {}
-    playerRef.current = null;
-  }, [stopProgress]);
-
-  return { load, play, pause, seekTo, setVolume, destroy };
+  // Stable API object
+  return useMemo(() => ({
+    load, play, pause, seekTo, setVolume
+  }), [load, play, pause, seekTo, setVolume]);
 }

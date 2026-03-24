@@ -75,14 +75,14 @@ function App() {
   // Volume sync
   useEffect(() => {
     ytPlayer.setVolume(isMuted ? 0 : volume);
-  }, [volume, isMuted]);
+  }, [volume, isMuted, ytPlayer]);
 
   // Play/pause sync
   useEffect(() => {
     if (!currentSong) return;
     if (isPlaying) ytPlayer.play();
     else ytPlayer.pause();
-  }, [isPlaying]);
+  }, [isPlaying, currentSong, ytPlayer]);
 
   // Load new song
   useEffect(() => {
@@ -90,7 +90,7 @@ function App() {
     setPlayerError(null);
     ytPlayer.load(currentSong.videoId);
     setIsPlaying(true);
-  }, [currentSong?.videoId]);
+  }, [currentSong?.videoId, ytPlayer]);
 
   // Media session
   useEffect(() => {
