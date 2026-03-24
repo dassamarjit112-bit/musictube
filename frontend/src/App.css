@@ -1011,22 +1011,79 @@ body {
     background: transparent;
   }
   .horizontal-scroll { padding-bottom: 24px; }
+}
+
+/* ── Mobile Branding ── */
+.mobile-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 20px; color: #fff; }
+.desktop-only { display: block; }
+.mobile-hide { display: block; }
+
+@media (max-width: 768px) {
+  .desktop-only { display: none !important; }
+  .mobile-hide { display: none !important; }
+  .mobile-only { display: flex !important; }
   
-  /* Floating Pill Player refined */
+  .main-header {
+    background: #030303;
+    padding: 0 16px;
+    height: 64px;
+    border: none;
+  }
+  .avatar { width: 32px; height: 32px; font-size: 14px; }
+  
+  .main-content { padding-bottom: 160px; } /* Room for Pill + Nav */
+
+  /* Section Styling Home Page Mobile */
+  .section-container h2 { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; padding-left: 0; }
+  .card { width: 165px; margin-right: 12px; }
+  .card-thumb { width: 165px; height: 165px; border-radius: 8px; }
+  .card-info { padding: 8px 0; }
+  .card-info h3 { font-size: 14px; font-weight: 600; }
+  .card-info p { font-size: 12px; opacity: 0.7; }
+  
+  /* Floating Pill refined for Bottom Nav */
   .player-bar-v2 {
-    bottom: 12px;
+    bottom: 80px; /* Above Bottom Nav */
     left: 8px;
     right: 8px;
-    height: 64px;
-    border-radius: 12px;
-    background: rgba(22, 22, 22, 0.98);
-    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    height: 56px;
+    border-radius: 10px;
   }
-  .progress-bar-container {
-    height: 3px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 0 0 12px 12px;
+  .track-info .thumb { width: 38px; height: 38px; }
+  .track-info .text h3 { font-size: 12px; font-weight: 500; }
+  
+  /* Bottom Navigation Style */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 68px;
+    background: rgba(3, 3, 3, 0.98);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex !important;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 2200;
+    padding-bottom: env(safe-area-inset-bottom);
   }
+  .bottom-nav button {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .bottom-nav button.active { color: #fff; }
+  .bottom-nav button span { font-size: 10px; }
 }
+
 
 

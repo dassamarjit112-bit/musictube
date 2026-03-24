@@ -449,13 +449,17 @@ function App() {
       <main className="main-content">
         <header className="main-header">
           <div className="header-left">
-            <button className="mobile-only menu-btn" onClick={() => setIsSidebarOpen(true)}>
+            <button className="mobile-hide menu-btn" onClick={() => setIsSidebarOpen(true)}>
               <Menu size={24} />
             </button>
+            <div className="mobile-only mobile-brand">
+              <Play size={24} fill="#f00" />
+              <span>Music</span>
+            </div>
             {(view.name === "artist" || view.name === "album" || view.name === "search") && (
               <button className="back-btn" onClick={goBack}><ArrowLeft size={20} /></button>
             )}
-            <div className="search-box">
+            <div className="search-box desktop-only">
               <Search size={20} />
               <form onSubmit={handleSearch}>
                 <input
@@ -468,6 +472,9 @@ function App() {
             </div>
           </div>
           <div className="user-profile">
+            <button className="mobile-only search-trigger" onClick={() => setView({ name: 'search' })}>
+              <Search size={24} />
+            </button>
             <button className="cast-btn" onClick={handleLogout} title="Logout"><Tv size={20} /></button>
             <div className="avatar">{user?.email?.[0].toUpperCase()}</div>
           </div>
@@ -868,6 +875,22 @@ function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="bottom-nav mobile-only">
+        <button onClick={() => navigateTo({ name: 'home' })} className={view.name === 'home' ? 'active' : ''}>
+          <Home size={22} />
+          <span>Home</span>
+        </button>
+        <button onClick={() => navigateTo({ name: 'explore' })} className={view.name === 'explore' ? 'active' : ''}>
+          <Compass size={22} />
+          <span>Explore</span>
+        </button>
+        <button onClick={() => navigateTo({ name: 'library' })} className={view.name === 'library' ? 'active' : ''}>
+          <Library size={22} />
+          <span>Library</span>
+        </button>
+      </div>
     </div>
   );
 }
