@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
   Volume2, ThumbsUp, ThumbsDown, MoreVertical, Search,
-  Home, Compass, Library, PlusCircle, Tv, ArrowLeft, Music2
+  Home, Compass, Library, PlusCircle, Tv, ArrowLeft, Music2, Menu
 } from "lucide-react";
 import { api } from "./api";
 import type { Song, HomeSection, SearchResult, ArtistDetail, AlbumDetail } from "./api";
@@ -42,7 +42,9 @@ function App() {
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [showMobilePlayer, setShowMobilePlayer] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>([]); // list of videoIds
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [favorites, setFavorites] = useState<Song[]>([]); // list of full song objects
+  const [history, setHistory] = useState<Song[]>([]);
   const [activeChip, setActiveChip] = useState<string | null>(null);
 
   const currentSongRef = useRef(currentSong);
@@ -121,11 +123,16 @@ function App() {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchFavorites(session.user.id);
+        fetchHistory(session.user.id);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchFavorites(session.user.id);
+        fetchHistory(session.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -143,9 +150,27 @@ function App() {
     if (view.name === "album") fetchAlbum((view as any).id);
   }, [isLoggedIn, view.name, (view as any).id]);
 
+  // Autostart first song from home feed if none selected
+  useEffect(() => {
+    if (homeData.length > 0 && homeData[0].items.length > 0 && !currentSong) {
+      const firstSection = homeData[0];
+      const song = firstSection.items.find((i: any) => i.type === "song" || i.type === "video");
+      if (song) {
+        console.log("⚡ Autostarting first song...");
+        setCurrentSong(song as Song);
+        setQueue(firstSection.items.filter((i: any) => i.type === "song" || i.type === "video") as Song[]);
+      }
+    }
+  }, [homeData, currentSong]);
+
   const fetchFavorites = async (userId: string) => {
-    const { data } = await supabase.from('favorites').select('item_id').eq('user_id', userId);
-    if (data) setFavorites(data.map(f => f.item_id));
+    const { data } = await supabase.from('favorites').select('video_id:item_id, title, artist, thumbnail').eq('user_id', userId);
+    if (data) setFavorites(data as any);
+  };
+
+  const fetchHistory = async (userId: string) => {
+    const { data } = await supabase.from('history').select('*').eq('user_id', userId).order('played_at', { ascending: false }).limit(30);
+    if (data) setHistory(data as any);
   };
 
   const logHistory = async (song: Song) => {
@@ -161,10 +186,10 @@ function App() {
 
   const toggleFavorite = async (song: Song) => {
     if (!user) return;
-    const isFav = favorites.includes(song.videoId);
+    const isFav = favorites.some(f => f.videoId === song.videoId);
     if (isFav) {
       await supabase.from('favorites').delete().eq('user_id', user.id).eq('item_id', song.videoId);
-      setFavorites(f => f.filter(id => id !== song.videoId));
+      setFavorites(f => f.filter(s => s.videoId !== song.videoId));
     } else {
       await supabase.from('favorites').insert({
         user_id: user.id,
@@ -174,7 +199,7 @@ function App() {
         artist: song.artist,
         thumbnail: song.thumbnail,
       });
-      setFavorites(f => [...f, song.videoId]);
+      setFavorites(f => [song, ...f]);
     }
   };
 
@@ -241,27 +266,30 @@ function App() {
   };
 
   const handleNext = async () => {
-    const song = currentSongRef.current;
-    if (!song || queueRef.current.length === 0) return;
-    const idx = queueRef.current.findIndex((s) => s.videoId === song.videoId);
+    const idx = queueRef.current.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
     
+    // Proactive Infinite Radio: Fetch 40 tracks when nearing end of current batch
+    if (idx >= queueRef.current.length - 3) {
+      const lastSong = currentSongRef.current;
+      if (lastSong) {
+        console.log("🌌 Deepening AI Radio Vibe...");
+        try {
+          const res = await api.watch(lastSong.videoId);
+          if (res.tracks && res.tracks.length > 0) {
+            const nextBatch = res.tracks.slice(1, 40);
+            setQueue(q => {
+              const uniqueBatch = nextBatch.filter(s => !q.find(sq => sq.videoId === s.videoId));
+              return [...q, ...uniqueBatch];
+            });
+          }
+        } catch (e) { console.error(e); }
+      }
+    }
+
     if (idx < queueRef.current.length - 1) {
       setCurrentSong(queueRef.current[idx + 1]);
     } else {
-      // AI SUGGESTIONS ENGINE (Auto-play)
-      console.log("Fetching AI suggestions based on vibe...");
-      try {
-        const res = await api.watch(song.videoId);
-        if (res.tracks && res.tracks.length > 0) {
-          const suggestions = res.tracks.slice(1, 11); // Skip current
-          setQueue(q => [...q, ...suggestions]);
-          setCurrentSong(suggestions[0]);
-        } else {
-          setIsPlaying(false);
-        }
-      } catch {
-        setIsPlaying(false);
-      }
+      setIsPlaying(false);
     }
   };
 
@@ -277,22 +305,37 @@ function App() {
     if (idx > 0) setCurrentSong(queue[idx - 1]);
   };
 
-  const playSong = (song: Song, songList?: Song[]) => {
+  const playSong = async (song: Song, songList?: Song[]) => {
     if (!song.videoId) return;
     console.log("▶ Playing:", song.title, "| videoId:", song.videoId);
+    
+    // Set immediate song to start playback
     setCurrentSong(song);
     setPlayed(0);
     setPlayedSeconds(0);
     setDuration(0);
     logHistory(song);
     
-    if (songList && songList.length > 0) {
+    // NEW: YouTube Music 'Radio' Logic (30+ tracks)
+    // If a list was provided (e.g. from an album), use it.
+    // Otherwise, generate an AI Radio based on the song clicked.
+    if (songList && songList.length > 5) {
       setQueue(songList);
     } else {
-      setQueue((q) => {
-        if (q.find(s => s.videoId === song.videoId)) return q;
-        return [...q, song];
-      });
+      console.log("🔮 Infinite Radio Initializing for:", song.title);
+      try {
+        const res = await api.watch(song.videoId);
+        if (res.tracks && res.tracks.length > 0) {
+          // Flattening and diversifying the list
+          const radioMix = [song, ...res.tracks.slice(1, 40)]; // Up to 40 tracks of same vibe
+          setQueue(radioMix);
+        } else {
+          setQueue(q => q.find(s => s.videoId === song.videoId) ? q : [...q, song]);
+        }
+      } catch (e) {
+        console.error("Radio Generation Failed:", e);
+        setQueue(q => q.find(s => s.videoId === song.videoId) ? q : [...q, song]);
+      }
     }
   };
 
@@ -320,6 +363,11 @@ function App() {
 
   const goBack = () => setView({ name: "home" });
 
+  const navigateTo = (v: View) => {
+    setView(v);
+    setIsSidebarOpen(false); // Close sidebar on mobile after selection
+  };
+
   // ─── Login Screen ────────────────────────────────────────────────────────────
   if (!isLoggedIn) {
     return <Auth />;
@@ -331,22 +379,53 @@ function App() {
 
   // ─── Main App ────────────────────────────────────────────────────────────────
   return (
-    <div className="app-container">
+    <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      {/* Sidebar Overlay (Mobile) */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div 
+            className="sidebar-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="logo-section"><Play size={24} fill="#f00" /><span>Music</span></div>
+      <aside className={`sidebar ${isSidebarOpen ? 'mobile-visible' : ''}`}>
+        <div className="logo-section">
+          <Play size={24} fill="#f00" />
+          <span>Music</span>
+          <button className="mobile-only close-sidebar" onClick={() => setIsSidebarOpen(false)}>
+            <ArrowLeft size={24} />
+          </button>
+        </div>
         <nav>
-          <button onClick={() => setView({ name: "home" })} className={view.name === "home" ? "active" : ""}>
+          <button onClick={() => navigateTo({ name: "home" })} className={view.name === "home" ? "active" : ""}>
             <Home size={24} /> <span>Home</span>
           </button>
-          <button onClick={() => setView({ name: "explore" })} className={view.name === "explore" ? "active" : ""}>
+          <button onClick={() => navigateTo({ name: "explore" })} className={view.name === "explore" ? "active" : ""}>
             <Compass size={24} /> <span>Explore</span>
           </button>
-          <button className={view.name === "library" ? "active" : ""}>
+          <button 
+            onClick={() => navigateTo({ name: "library" })} 
+            className={view.name === "library" ? "active" : ""}
+          >
             <Library size={24} /> <span>Library</span>
           </button>
         </nav>
-        <div className="playlist-btn"><PlusCircle size={20} /> New playlist</div>
+        <div className="sidebar-divider" />
+        <div className="playlists-section">
+          <button className="new-playlist-btn" onClick={() => navigateTo({ name: 'library' })}>
+            <PlusCircle size={20} /> <span>New Playlist</span>
+          </button>
+          <div className="playlist-item" onClick={() => navigateTo({ name: 'library' })}>
+            <div className="playlist-icon liked"><ThumbsUp size={16} fill="currentColor" /></div>
+            <span>Liked Songs</span>
+          </div>
+        </div>
 
         {/* Queue */}
         {queue.length > 0 && (
@@ -370,7 +449,10 @@ function App() {
       <main className="main-content">
         <header className="main-header">
           <div className="header-left">
-            {(view.name === "artist" || view.name === "album") && (
+            <button className="mobile-only menu-btn" onClick={() => setIsSidebarOpen(true)}>
+              <Menu size={24} />
+            </button>
+            {(view.name === "artist" || view.name === "album" || view.name === "search") && (
               <button className="back-btn" onClick={goBack}><ArrowLeft size={20} /></button>
             )}
             <div className="search-box">
@@ -435,10 +517,10 @@ function App() {
                             <div className="play-overlay">
                               <Play size={24} fill="#fff" />
                               <button 
-                                className={`fav-btn ${favorites.includes(item.videoId) ? 'active' : ''}`}
+                                className={`fav-btn ${favorites.some(f => f.videoId === item.videoId) ? 'active' : ''}`}
                                 onClick={(e) => { e.stopPropagation(); toggleFavorite(item as Song); }}
                               >
-                                <ThumbsUp size={16} fill={favorites.includes(item.videoId) ? "currentColor" : "none"} />
+                                <ThumbsUp size={16} fill={favorites.some(f => f.videoId === item.videoId) ? "currentColor" : "none"} />
                               </button>
                             </div>
                           )}
@@ -483,6 +565,65 @@ function App() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ── LIBRARY ── */}
+          {view.name === "library" && (
+            <div className="library-view">
+              <div className="library-grid">
+                <section>
+                  <h2>Liked Songs</h2>
+                  {favorites.length === 0 ? (
+                    <p className="no-data">Your favorites will appear here.</p>
+                  ) : (
+                    <div className="track-list">
+                      {favorites.map((song, i) => (
+                        <div key={i} className="track-row" onClick={() => playSong(song, favorites)}>
+                          <span className="track-num">{i + 1}</span>
+                          <img src={song.thumbnail} alt="" />
+                          <div className="track-info-col">
+                            <h3>{song.title}</h3>
+                            <p>{song.artist}</p>
+                          </div>
+                          <button 
+                            className="fav-btn active"
+                            onClick={(e) => { e.stopPropagation(); toggleFavorite(song); }}
+                          >
+                            <ThumbsUp size={16} fill="currentColor" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section>
+                  <h2>Recent Activity</h2>
+                  {history.length === 0 ? (
+                    <p className="no-data">Start listening to build your history!</p>
+                  ) : (
+                    <div className="track-list">
+                      {history.map((song, i) => (
+                        <div key={i} className="track-row" onClick={() => playSong(song)}>
+                          <span className="track-num">{i + 1}</span>
+                          <img src={song.thumbnail} alt="" />
+                          <div className="track-info-col">
+                            <h3>{song.title}</h3>
+                            <p>{song.artist}</p>
+                          </div>
+                          <button 
+                            className={`fav-btn ${favorites.some(f => f.videoId === song.videoId) ? 'active' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); toggleFavorite(song); }}
+                          >
+                            <ThumbsUp size={16} fill={favorites.some(f => f.videoId === song.videoId) ? "#fff" : "none"} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </div>
             </div>
           )}
 

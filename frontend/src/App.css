@@ -83,19 +83,53 @@ body {
   background: rgba(255,255,255,0.05);
   color: #fff;
 }
-.playlist-btn {
+.sidebar-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 8px 12px; }
+.playlists-section { padding: 4px 8px; display: flex; flex-direction: column; gap: 4px; }
+.new-playlist-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--text-secondary);
-  cursor: pointer;
+  gap: 12px;
+  width: 100%;
   padding: 10px 16px;
+  background: rgba(255,255,255,0.05);
+  border: none;
+  color: var(--text-secondary);
   border-radius: 8px;
   font-size: 14px;
-  transition: background 0.15s;
-  margin-top: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: 0.2s;
+  font-family: inherit;
 }
-.playlist-btn:hover { background: rgba(255,255,255,0.05); color: #fff; }
+.new-playlist-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+.playlist-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+  color: var(--text-secondary);
+}
+.playlist-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+
+.playlist-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #333;
+}
+.playlist-icon.liked {
+  background: linear-gradient(135deg, #1a73e8, #4285f4);
+  color: #fff;
+}
+.playlist-item span { font-size: 14px; font-weight: 500; }
 
 /* Queue */
 .queue-section {
@@ -567,6 +601,31 @@ body {
 .progress-labels { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .volume-range { width: 90px; accent-color: #fff; cursor: pointer; }
 
+/* ── Library ────────────────────────────────────────────────────────────────── */
+.library-view h2 {
+  font-size: 24px;
+  margin-bottom: 24px;
+  color: #fff;
+  font-weight: 700;
+}
+.library-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  padding: 16px 0 48px;
+}
+.library-grid section {
+  min-width: 0;
+  background: rgba(255,255,255,0.02);
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+@media (max-width: 1100px) {
+  .library-grid { grid-template-columns: 1fr; gap: 32px; }
+}
+
 /* ── Login ───────────────────────────────────────────────────────────────────── */
 .login-page {
   height: 100vh;
@@ -899,9 +958,75 @@ body {
 }
 
 
-@media (max-width: 768px) {
-  .home-view { padding: 0 16px; }
-  .section-container { margin-bottom: 32px; }
-  .card { width: 140px; }
-  .card-thumb { height: 140px; }
+/* ── Sidebar Drawer ── */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 2500;
+  backdrop-filter: blur(4px);
 }
+
+.mobile-only { display: none !important; }
+
+@media (max-width: 768px) {
+  .mobile-only { display: flex !important; }
+  .app-container { grid-template-columns: 1fr; }
+  
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    bottom: 0;
+    width: 260px;
+    z-index: 3000;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #000;
+    height: 100vh;
+    box-shadow: 20px 0 50px rgba(0,0,0,0.5);
+    display: flex !important;
+  }
+  .sidebar.mobile-visible { transform: translateX(280px); }
+  
+  .menu-btn, .close-sidebar {
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+  }
+  
+  .main-content { padding-bottom: 120px; }
+  .header-left { gap: 12px; }
+  .search-box { flex: 1; }
+
+  /* Full screen lists */
+  .track-list, .search-list { padding: 0; }
+  .track-row, .search-row { 
+    margin: 0 -12px; 
+    padding: 12px 16px; 
+    border-radius: 0;
+    background: transparent;
+  }
+  .horizontal-scroll { padding-bottom: 24px; }
+  
+  /* Floating Pill Player refined */
+  .player-bar-v2 {
+    bottom: 12px;
+    left: 8px;
+    right: 8px;
+    height: 64px;
+    border-radius: 12px;
+    background: rgba(22, 22, 22, 0.98);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  }
+  .progress-bar-container {
+    height: 3px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 0 0 12px 12px;
+  }
+}
+
+
