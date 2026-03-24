@@ -7,6 +7,9 @@ import {
 import { api } from "./api";
 import type { Song, HomeSection, SearchResult, ArtistDetail, AlbumDetail } from "./api";
 import { useYouTubePlayer } from "./useYouTubePlayer";
+import { supabase } from "./lib/supabase";
+import { Auth } from "./components/Auth";
+import { motion, AnimatePresence } from "framer-motion";
 import "./App.css";
 
 type View =
@@ -23,7 +26,8 @@ function App() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [session, setSession] = useState<any>(null);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
@@ -38,11 +42,17 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [showMobilePlayer, setShowMobilePlayer] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]); // list of videoIds
+  const [history, setHistory] = useState<Song[]>([]);
+  const [activeChip, setActiveChip] = useState<string | null>(null);
 
   const currentSongRef = useRef(currentSong);
   currentSongRef.current = currentSong;
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
+  const queueRef = useRef(queue);
+  queueRef.current = queue;
 
   const ytPlayer = useYouTubePlayer("yt-player-container", {
     onStateChange: (state) => {
@@ -107,6 +117,28 @@ function App() {
     navigator.mediaSession.setActionHandler("nexttrack", handleNext);
   }, [currentSong]);
 
+  // Supabase Auth Listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchFavorites(session.user.id);
+        fetchHistory(session.user.id);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Sync session loading
+  const isLoggedIn = !!user;
+
   // Fetch data on tab change
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -115,6 +147,47 @@ function App() {
     if (view.name === "artist") fetchArtist((view as any).id);
     if (view.name === "album") fetchAlbum((view as any).id);
   }, [isLoggedIn, view.name, (view as any).id]);
+
+  const fetchFavorites = async (userId: string) => {
+    const { data } = await supabase.from('favorites').select('item_id').eq('user_id', userId);
+    if (data) setFavorites(data.map(f => f.item_id));
+  };
+
+  const fetchHistory = async (userId: string) => {
+    const { data } = await supabase.from('history').select('*').eq('user_id', userId).order('played_at', { ascending: false }).limit(20);
+    // mapping logic for song format
+    if (data) setHistory(data as any);
+  };
+
+  const logHistory = async (song: Song) => {
+    if (!user) return;
+    await supabase.from('history').insert({
+      user_id: user.id,
+      video_id: song.videoId,
+      title: song.title,
+      artist: song.artist,
+      thumbnail: song.thumbnail,
+    });
+  };
+
+  const toggleFavorite = async (song: Song) => {
+    if (!user) return;
+    const isFav = favorites.includes(song.videoId);
+    if (isFav) {
+      await supabase.from('favorites').delete().eq('user_id', user.id).eq('item_id', song.videoId);
+      setFavorites(f => f.filter(id => id !== song.videoId));
+    } else {
+      await supabase.from('favorites').insert({
+        user_id: user.id,
+        item_id: song.videoId,
+        type: 'song',
+        title: song.title,
+        artist: song.artist,
+        thumbnail: song.thumbnail,
+      });
+      setFavorites(f => [...f, song.videoId]);
+    }
+  };
 
   const fetchHome = async () => {
     try {
@@ -178,12 +251,29 @@ function App() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     const song = currentSongRef.current;
-    if (!song || queue.length === 0) return;
-    const idx = queue.findIndex((s) => s.videoId === song.videoId);
-    if (idx < queue.length - 1) setCurrentSong(queue[idx + 1]);
-    else setIsPlaying(false);
+    if (!song || queueRef.current.length === 0) return;
+    const idx = queueRef.current.findIndex((s) => s.videoId === song.videoId);
+    
+    if (idx < queueRef.current.length - 1) {
+      setCurrentSong(queueRef.current[idx + 1]);
+    } else {
+      // AI SUGGESTIONS ENGINE (Auto-play)
+      console.log("Fetching AI suggestions based on vibe...");
+      try {
+        const res = await api.watch(song.videoId);
+        if (res.tracks && res.tracks.length > 0) {
+          const suggestions = res.tracks.slice(1, 11); // Skip current
+          setQueue(q => [...q, ...suggestions]);
+          setCurrentSong(suggestions[0]);
+        } else {
+          setIsPlaying(false);
+        }
+      } catch {
+        setIsPlaying(false);
+      }
+    }
   };
 
   const handlePrev = () => {
@@ -205,11 +295,32 @@ function App() {
     setPlayed(0);
     setPlayedSeconds(0);
     setDuration(0);
+    logHistory(song);
+    
     if (songList && songList.length > 0) {
       setQueue(songList);
-    } else if (!queue.find((s) => s.videoId === song.videoId)) {
-      setQueue((q) => [...q, song]);
+    } else {
+      setQueue((q) => {
+        if (q.find(s => s.videoId === song.videoId)) return q;
+        return [...q, song];
+      });
     }
+  };
+
+  const handleChipClick = async (chip: string) => {
+    setActiveChip(chip);
+    const categoryMap: Record<string, string> = {
+      "Energize": "Energize",
+      "Relax": "Relax",
+      "Workout": "Workout",
+      "Commute": "Commute",
+      "Focus": "Focus"
+    };
+    try {
+      // Mocking discovery path
+      const res = await api.search(chip + " songs");
+      setHomeData([{ title: chip + " Hits", items: res.results }]);
+    } catch (e) { console.error(e); }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,26 +340,12 @@ function App() {
 
   // ─── Login Screen ────────────────────────────────────────────────────────────
   if (!isLoggedIn) {
-    return (
-      <div className="login-page">
-        <div className="login-card">
-          <div className="login-logo">
-            <Play size={40} fill="#f00" />
-            <span>YouTube Music</span>
-          </div>
-          <h1>Sign in</h1>
-          <p>to continue to YouTube Music</p>
-          <form onSubmit={(e) => { e.preventDefault(); setIsLoggedIn(true); }}>
-            <input type="email" placeholder="Email or phone" required />
-            <div className="login-footer">
-              <button type="button" className="create-account">Create account</button>
-              <button type="submit" className="next-btn">Next</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
+    return <Auth />;
   }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
   // ─── Main App ────────────────────────────────────────────────────────────────
   return (
@@ -307,8 +404,8 @@ function App() {
             </div>
           </div>
           <div className="user-profile">
-            <button className="cast-btn"><Tv size={20} /></button>
-            <div className="avatar">SD</div>
+            <button className="cast-btn" onClick={handleLogout} title="Logout"><Tv size={20} /></button>
+            <div className="avatar">{user?.email?.[0].toUpperCase()}</div>
           </div>
         </header>
 
@@ -319,7 +416,13 @@ function App() {
             <div className="home-view">
               <div className="chips">
                 {["Energize", "Relax", "Workout", "Commute", "Focus"].map((c) => (
-                  <button key={c} className="chip">{c}</button>
+                  <button 
+                    key={c} 
+                    className={`chip ${activeChip === c ? 'active' : ''}`}
+                    onClick={() => handleChipClick(c)}
+                  >
+                    {c}
+                  </button>
                 ))}
               </div>
               {homeData.length === 0 && <div className="loader" />}
@@ -345,9 +448,17 @@ function App() {
                         }}
                       >
                         <div className="card-thumb">
-                          <img src={item.thumbnail} alt="" />
+                          <img src={item.thumbnail} alt="" loading="lazy" />
                           {(item.type === "song" || item.type === "video") && (
-                            <div className="play-overlay"><Play size={24} fill="#fff" /></div>
+                            <div className="play-overlay">
+                              <Play size={24} fill="#fff" />
+                              <button 
+                                className={`fav-btn ${favorites.includes(item.videoId) ? 'active' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); toggleFavorite(item as Song); }}
+                              >
+                                <ThumbsUp size={16} fill={favorites.includes(item.videoId) ? "currentColor" : "none"} />
+                              </button>
+                            </div>
                           )}
                         </div>
                         <div className="card-info">
@@ -544,13 +655,14 @@ function App() {
       </main>
 
       {/* ── Player Bar ── */}
-      <footer className="player-bar-v2">
+      <footer className="player-bar-v2" onClick={() => window.innerWidth < 768 && setShowMobilePlayer(true)}>
         <div className="progress-bar-container">
           <input
             type="range" min={0} max={0.9999} step="any"
             value={played}
             onChange={handleSeek}
             className="progress-range"
+            onClick={(e) => e.stopPropagation()}
           />
         </div>
         <div className="player-main">
@@ -571,17 +683,18 @@ function App() {
           )}
 
           <div className="controls">
-            <button onClick={handlePrev}><SkipBack size={24} fill="currentColor" /></button>
+            <button onClick={(e) => { e.stopPropagation(); handlePrev(); }}><SkipBack size={24} fill="currentColor" /></button>
             <button
               className="play-btn"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 if (!currentSong) return;
                 setIsPlaying(!isPlaying);
               }}
             >
               {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" />}
             </button>
-            <button onClick={handleNext}><SkipForward size={24} fill="currentColor" /></button>
+            <button onClick={(e) => { e.stopPropagation(); handleNext(); }}><SkipForward size={24} fill="currentColor" /></button>
           </div>
 
           <div className="actions">
@@ -590,7 +703,7 @@ function App() {
             </div>
             <button
               className="icon-btn"
-              onClick={() => setIsMuted((m) => !m)}
+              onClick={(e) => { e.stopPropagation(); setIsMuted((m) => !m); }}
               title={isMuted ? "Unmute" : "Mute"}
             >
               <Volume2 size={20} style={{ opacity: isMuted ? 0.4 : 1 }} />
@@ -600,6 +713,7 @@ function App() {
               value={isMuted ? 0 : volume}
               onChange={(e) => { setVolume(parseFloat(e.target.value)); setIsMuted(false); }}
               className="volume-range"
+              onClick={(e) => e.stopPropagation()}
             />
             <Shuffle size={18} />
             <Repeat size={18} />
@@ -611,8 +725,128 @@ function App() {
       <div className="yt-engine">
         <div id="yt-player-container" />
       </div>
+      <AnimatePresence>
+        {showMobilePlayer && currentSong && (
+          <FullScreenPlayer 
+            song={currentSong}
+            isPlaying={isPlaying}
+            played={played}
+            playedSeconds={playedSeconds}
+            duration={duration}
+            queue={queue}
+            favorites={favorites}
+            onClose={() => setShowMobilePlayer(false)}
+            onTogglePlay={() => setIsPlaying(!isPlaying)}
+            onNext={handleNext}
+            onPrev={handlePrev}
+            onSeek={handleSeek}
+            onPlaySong={playSong}
+            onToggleFavorite={toggleFavorite}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+
+// ─── FULL SCREEN MOBILE PLAYER ───
+const FullScreenPlayer = ({ 
+  song, 
+  isPlaying, 
+  played, 
+  playedSeconds, 
+  duration, 
+  onClose, 
+  onTogglePlay, 
+  onNext, 
+  onPrev, 
+  onSeek,
+  queue,
+  onPlaySong,
+  favorites,
+  onToggleFavorite
+}: any) => {
+  return (
+    <motion.div 
+      className="mobile-player-overlay"
+      initial={{ y: "100%" }}
+      animate={{ y: 0 }}
+      exit={{ y: "100%" }}
+      transition={{ type: "spring", damping: 25, stiffness: 200 }}
+    >
+      <header className="mobile-player-header">
+        <button className="close-btn" onClick={onClose}><SkipBack size={24} style={{ transform: 'rotate(-90deg)' }} /></button>
+        <div className="title">Now Playing</div>
+        <button className="more-btn"><MoreVertical size={24} /></button>
+      </header>
+
+      <div className="player-content-scroll">
+        <div className="player-hero">
+          <motion.img 
+            layoutId={`player-thumb-${song.videoId}`}
+            src={song.thumbnail} 
+            alt="" 
+            className="big-thumb" 
+          />
+          <div className="meta">
+            <div className="text">
+              <h2>{song.title}</h2>
+              <p>{song.artist}</p>
+            </div>
+            <button 
+              className={`fav-btn ${favorites.includes(song.videoId) ? 'active' : ''}`}
+              onClick={() => onToggleFavorite(song)}
+            >
+              <ThumbsUp size={24} fill={favorites.includes(song.videoId) ? "currentColor" : "none"} />
+            </button>
+          </div>
+        </div>
+
+        <div className="player-controls-section">
+          <div className="progress-section">
+            <input 
+              type="range" min={0} max={0.9999} step="any"
+              value={played}
+              onChange={onSeek}
+              className="mobile-progress"
+            />
+            <div className="time-labels">
+              <span>{Math.floor(playedSeconds/60)}:{(Math.floor(playedSeconds%60)).toString().padStart(2,'0')}</span>
+              <span>{Math.floor(duration/60)}:{(Math.floor(duration%60)).toString().padStart(2,'0')}</span>
+            </div>
+          </div>
+          
+          <div className="main-btns">
+            <button onClick={onPrev}><SkipBack size={32} fill="currentColor" /></button>
+            <button className="big-play" onClick={onTogglePlay}>
+              {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" />}
+            </button>
+            <button onClick={onNext}><SkipForward size={32} fill="currentColor" /></button>
+          </div>
+        </div>
+
+        <div className="mobile-up-next">
+          <h3>Up Next</h3>
+          <div className="up-next-list">
+            {queue.map((s: any, i: number) => (
+              <div 
+                key={i} 
+                className={`next-row ${song.videoId === s.videoId ? 'active' : ''}`}
+                onClick={() => onPlaySong(s)}
+              >
+                <img src={s.thumbnail} alt="" />
+                <div className="txt">
+                  <p className="t">{s.title}</p>
+                  <p className="a">{s.artist}</p>
+                </div>
+                <MoreVertical size={16} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
 
 export default App;
