@@ -481,204 +481,226 @@ function App() {
         </header>
 
         <section className="scroll-area">
-
-          {/* ── HOME ── */}
-          {view.name === "home" && (
-            <div className="home-view">
-              <div className="chips">
-                {["Energize", "Relax", "Workout", "Commute", "Focus"].map((c) => (
-                  <button 
-                    key={c} 
-                    className={`chip ${activeChip === c ? 'active' : ''}`}
-                    onClick={() => handleChipClick(c)}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-              {homeData.length === 0 && <div className="loader" />}
-              {homeData.map((s, i) => (
-                <div key={i} className="section-container">
-                  <h2>{s.title}</h2>
-                  <div className="horizontal-scroll">
-                    {s.items.map((item: any, j) => (
-                      <div
-                        key={j}
-                        className="card"
-                        onClick={() => {
-                          if (item.type === "song" || item.type === "video") {
-                            const songList = s.items.filter(
-                              (x: any) => x.type === "song" || x.type === "video"
-                            ) as Song[];
-                            playSong(item as Song, songList);
-                          } else if (item.type === "artist" && item.browseId) {
-                            setView({ name: "artist", id: item.browseId } as any);
-                          } else if (item.type === "album" && item.browseId) {
-                            setView({ name: "album", id: item.browseId } as any);
-                          }
-                        }}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={view.name + ((view as any).id || "")}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+            >
+              {/* ── HOME ── */}
+              {view.name === "home" && (
+                <div className="home-view">
+                  <div className="chips">
+                    {["Energize", "Relax", "Workout", "Commute", "Focus"].map((c) => (
+                      <button 
+                        key={c} 
+                        className={`chip ${activeChip === c ? 'active' : ''}`}
+                        onClick={() => handleChipClick(c)}
                       >
-                        <div className="card-thumb">
-                          <img src={item.thumbnail} alt="" loading="lazy" />
-                          {(item.type === "song" || item.type === "video") && (
-                            <div className="play-overlay">
-                              <Play size={24} fill="#fff" />
-                              <button 
-                                className={`fav-btn ${favorites.some(f => f.videoId === item.videoId) ? 'active' : ''}`}
-                                onClick={(e) => { e.stopPropagation(); toggleFavorite(item as Song); }}
-                              >
-                                <ThumbsUp size={16} fill={favorites.some(f => f.videoId === item.videoId) ? "currentColor" : "none"} />
-                              </button>
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                  {homeData.length === 0 && (
+                    <div className="loading-grid">
+                      {[1,2,3,4].map(i => <div key={i} className="skeleton-card" />)}
+                    </div>
+                  )}
+                  {homeData.map((s, i) => (
+                    <div key={i} className="section-container">
+                      <h2>{s.title}</h2>
+                      <div className="horizontal-scroll">
+                        {s.items.map((item: any, j) => (
+                          <div
+                            key={j}
+                            className="card"
+                            onClick={() => {
+                              if (item.type === "song" || item.type === "video") {
+                                const songList = s.items.filter(
+                                  (x: any) => x.type === "song" || x.type === "video"
+                                ) as Song[];
+                                playSong(item as Song, songList);
+                              } else if (item.type === "artist" && item.browseId) {
+                                setView({ name: "artist", id: item.browseId } as any);
+                              } else if (item.type === "album" && item.browseId) {
+                                setView({ name: "album", id: item.browseId } as any);
+                              }
+                            }}
+                          >
+                            <div className="card-thumb">
+                              <img src={item.thumbnail} alt="" loading="lazy" />
+                              {(item.type === "song" || item.type === "video") && (
+                                <div className="play-overlay">
+                                  <Play size={24} fill="#fff" />
+                                  <button 
+                                    className={`fav-btn ${favorites.some(f => f.videoId === item.videoId) ? 'active' : ''}`}
+                                    onClick={(e) => { e.stopPropagation(); toggleFavorite(item as Song); }}
+                                  >
+                                    <ThumbsUp size={16} fill={favorites.some(f => f.videoId === item.videoId) ? "currentColor" : "none"} />
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        <div className="card-info">
-                          <h3>{item.title || item.name}</h3>
-                          <p>{item.artist || item.subscribers || ""}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── EXPLORE ── */}
-          {view.name === "explore" && (
-            <div className="explore-view">
-              <h2>Explore</h2>
-              {isLoadingExplore ? <div className="loader" /> : exploreData.map((s, i) => (
-                <div key={i} className="section-container">
-                  <h2>{s.title}</h2>
-                  <div className="horizontal-scroll">
-                    {s.items.map((item: any, j) => (
-                      <div
-                        key={j}
-                        className="card"
-                        onClick={() => {
-                          if (item.type === "song" || item.type === "video") playSong(item as Song);
-                          else if (item.type === "album" && item.browseId) setView({ name: "album", id: item.browseId } as any);
-                          else if (item.type === "artist" && item.browseId) setView({ name: "artist", id: item.browseId } as any);
-                        }}
-                      >
-                        <div className="card-thumb"><img src={item.thumbnail} alt="" /></div>
-                        <div className="card-info">
-                          <h3>{item.title || item.name}</h3>
-                          <p>{item.artist || item.year || ""}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── LIBRARY ── */}
-          {view.name === "library" && (
-            <div className="library-view">
-              <div className="library-grid">
-                <section>
-                  <h2>Liked Songs</h2>
-                  {favorites.length === 0 ? (
-                    <p className="no-data">Your favorites will appear here.</p>
-                  ) : (
-                    <div className="track-list">
-                      {favorites.map((song, i) => (
-                        <div key={i} className="track-row" onClick={() => playSong(song, favorites)}>
-                          <span className="track-num">{i + 1}</span>
-                          <img src={song.thumbnail} alt="" />
-                          <div className="track-info-col">
-                            <h3>{song.title}</h3>
-                            <p>{song.artist}</p>
+                            <div className="card-info">
+                              <h3>{item.title || item.name}</h3>
+                              <p>{item.artist || item.subscribers || ""}</p>
+                            </div>
                           </div>
-                          <button 
-                            className="fav-btn active"
-                            onClick={(e) => { e.stopPropagation(); toggleFavorite(song); }}
-                          >
-                            <ThumbsUp size={16} fill="currentColor" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                <section>
-                  <h2>Recent Activity</h2>
-                  {history.length === 0 ? (
-                    <p className="no-data">Start listening to build your history!</p>
-                  ) : (
-                    <div className="track-list">
-                      {history.map((song, i) => (
-                        <div key={i} className="track-row" onClick={() => playSong(song)}>
-                          <span className="track-num">{i + 1}</span>
-                          <img src={song.thumbnail} alt="" />
-                          <div className="track-info-col">
-                            <h3>{song.title}</h3>
-                            <p>{song.artist}</p>
-                          </div>
-                          <button 
-                            className={`fav-btn ${favorites.some(f => f.videoId === song.videoId) ? 'active' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); toggleFavorite(song); }}
-                          >
-                            <ThumbsUp size={16} fill={favorites.some(f => f.videoId === song.videoId) ? "#fff" : "none"} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              </div>
-            </div>
-          )}
-
-          {/* ── SEARCH ── */}
-          {view.name === "search" && (
-            <div className="search-view">
-              <h2>Results for "{searchQuery}"</h2>
-              {isSearching ? <div className="loader" /> : (
-                <div className="search-list">
-                  {searchResults.map((item: any, i) => (
-                    <div
-                      key={i}
-                      className="search-row"
-                      onClick={() => {
-                        if (item.type === "song" || item.type === "video") {
-                          const songList = searchResults.filter(
-                            (x: any) => x.type === "song" || x.type === "video"
-                          ) as Song[];
-                          playSong(item as Song, songList);
-                        } else if (item.type === "artist" && item.browseId) {
-                          setView({ name: "artist", id: item.browseId } as any);
-                        } else if (item.type === "album" && item.browseId) {
-                          setView({ name: "album", id: item.browseId } as any);
-                        }
-                      }}
-                    >
-                      <img src={item.thumbnail} alt="" className="row-thumb" />
-                      <div className="row-info">
-                        <h3>{item.title || item.name}</h3>
-                        <p className="row-type-badge">{item.type}</p>
-                        <p>{item.artist || item.subscribers || ""}</p>
-                      </div>
-                      <div className="row-actions">
-                        {(item.type === "song" || item.type === "video") && (
-                          <><ThumbsUp size={18} /><ThumbsDown size={18} /></>
-                        )}
-                        <MoreVertical size={18} />
+                        ))}
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-          )}
+
+              {/* ── EXPLORE ── */}
+              {view.name === "explore" && (
+                <div className="explore-view">
+                  <h2>Explore</h2>
+                  {isLoadingExplore ? (
+                    <div className="loading-grid">
+                      {[1,2].map(i => <div key={i} className="skeleton-card" />)}
+                    </div>
+                  ) : exploreData.map((s, i) => (
+                    <div key={i} className="section-container">
+                      <h2>{s.title}</h2>
+                      <div className="horizontal-scroll">
+                        {s.items.map((item: any, j) => (
+                          <div
+                            key={j}
+                            className="card"
+                            onClick={() => {
+                              if (item.type === "song" || item.type === "video") playSong(item as Song);
+                              else if (item.type === "album" && item.browseId) setView({ name: "album", id: item.browseId } as any);
+                              else if (item.type === "artist" && item.browseId) setView({ name: "artist", id: item.browseId } as any);
+                            }}
+                          >
+                            <div className="card-thumb"><img src={item.thumbnail} alt="" /></div>
+                            <div className="card-info">
+                              <h3>{item.title || item.name}</h3>
+                              <p>{item.artist || item.year || ""}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── LIBRARY ── */}
+              {view.name === "library" && (
+                <div className="library-view">
+                  <div className="library-grid">
+                    <section>
+                      <h2>Liked Songs</h2>
+                      {favorites.length === 0 ? (
+                        <p className="no-data">Your favorites will appear here.</p>
+                      ) : (
+                        <div className="track-list">
+                          {favorites.map((song, i) => (
+                            <div key={i} className="track-row" onClick={() => playSong(song, favorites)}>
+                              <span className="track-num">{i + 1}</span>
+                              <img src={song.thumbnail} alt="" />
+                              <div className="track-info-col">
+                                <h3>{song.title}</h3>
+                                <p>{song.artist}</p>
+                              </div>
+                              <button 
+                                className="fav-btn active"
+                                onClick={(e) => { e.stopPropagation(); toggleFavorite(song); }}
+                              >
+                                <ThumbsUp size={16} fill="currentColor" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+
+                    <section>
+                      <h2>Recent Activity</h2>
+                      {history.length === 0 ? (
+                        <p className="no-data">Start listening to build your history!</p>
+                      ) : (
+                        <div className="track-list">
+                          {history.map((song, i) => (
+                            <div key={i} className="track-row" onClick={() => playSong(song)}>
+                              <span className="track-num">{i + 1}</span>
+                              <img src={song.thumbnail} alt="" />
+                              <div className="track-info-col">
+                                <h3>{song.title}</h3>
+                                <p>{song.artist}</p>
+                              </div>
+                              <button 
+                                className={`fav-btn ${favorites.some(f => f.videoId === song.videoId) ? 'active' : ''}`}
+                                onClick={(e) => { e.stopPropagation(); toggleFavorite(song); }}
+                              >
+                                <ThumbsUp size={16} fill={favorites.some(f => f.videoId === song.videoId) ? "#fff" : "none"} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  </div>
+                </div>
+              )}
+
+              {/* ── SEARCH ── */}
+              {view.name === "search" && (
+                <div className="search-view">
+                  <h2>Results for "{searchQuery}"</h2>
+                  {isSearching ? <div className="loader" /> : (
+                    <div className="search-list">
+                      {searchResults.map((item: any, i) => (
+                        <div
+                          key={i}
+                          className="search-row"
+                          onClick={() => {
+                            if (item.type === "song" || item.type === "video") {
+                              const songList = searchResults.filter(
+                                (x: any) => x.type === "song" || x.type === "video"
+                              ) as Song[];
+                              playSong(item as Song, songList);
+                            } else if (item.type === "artist" && item.browseId) {
+                                setView({ name: "artist", id: item.browseId } as any);
+                              } else if (item.type === "album" && item.browseId) {
+                                setView({ name: "album", id: item.browseId } as any);
+                              }
+                          }}
+                        >
+                          <img src={item.thumbnail} alt="" className="row-thumb" />
+                          <div className="row-info">
+                            <h3>{item.title || item.name}</h3>
+                            <p className="row-type-badge">{item.type}</p>
+                            <p>{item.artist || item.subscribers || ""}</p>
+                          </div>
+                          <div className="row-actions">
+                            {(item.type === "song" || item.type === "video") && (
+                              <><ThumbsUp size={18} /><ThumbsDown size={18} /></>
+                            )}
+                            <MoreVertical size={18} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
 
           {/* ── ARTIST ── */}
           {view.name === "artist" && (
-            <div className="detail-view">
+            <motion.div 
+              className="detail-view"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
               {isLoading && <div className="loader" />}
               {artistData && (
                 <>
@@ -732,12 +754,17 @@ function App() {
                   </div>
                 </>
               )}
-            </div>
+            </motion.div>
           )}
 
           {/* ── ALBUM ── */}
           {view.name === "album" && (
-            <div className="detail-view">
+            <motion.div 
+              className="detail-view"
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 1.02, opacity: 0 }}
+            >
               {isLoading && <div className="loader" />}
               {albumData && (
                 <>
@@ -778,7 +805,7 @@ function App() {
                   </div>
                 </>
               )}
-            </div>
+            </motion.div>
           )}
 
         </section>
@@ -786,6 +813,7 @@ function App() {
 
       {/* ── Player Bar ── */}
       <footer className="player-bar-v2" onClick={() => window.innerWidth < 768 && setShowMobilePlayer(true)}>
+        <div className="mini-player-bg" style={{ backgroundImage: currentSong ? `url(${currentSong.thumbnail})` : 'none' }} />
         <div className="progress-bar-container">
           <input
             type="range" min={0} max={0.9999} step="any"
@@ -940,10 +968,10 @@ const FullScreenPlayer = ({
               <p>{song.artist}</p>
             </div>
             <button 
-              className={`fav-btn ${favorites.includes(song.videoId) ? 'active' : ''}`}
+              className={`fav-btn ${favorites.some((f:any) => f.videoId === song.videoId) ? 'active' : ''}`}
               onClick={() => onToggleFavorite(song)}
             >
-              <ThumbsUp size={24} fill={favorites.includes(song.videoId) ? "currentColor" : "none"} />
+              <ThumbsUp size={24} fill={favorites.some((f:any) => f.videoId === song.videoId) ? "currentColor" : "none"} />
             </button>
           </div>
         </div>
@@ -965,27 +993,33 @@ const FullScreenPlayer = ({
           <div className="main-btns">
             <button onClick={onPrev}><SkipBack size={32} fill="currentColor" /></button>
             <button className="big-play" onClick={onTogglePlay}>
-              {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" />}
+              {isPlaying ? <Pause size={42} fill="currentColor" /> : <Play size={42} fill="currentColor" style={{ marginLeft: '4px' }} />}
             </button>
             <button onClick={onNext}><SkipForward size={32} fill="currentColor" /></button>
           </div>
         </div>
 
         <div className="mobile-up-next">
-          <h3>Up Next</h3>
+          <div className="section-header">
+            <h3>Up Next</h3>
+            <span className="badge">Radio</span>
+          </div>
           <div className="up-next-list">
-            {queue.map((s: any, i: number) => (
+            {queue.slice(0, 50).map((s: any, i: number) => (
               <div 
                 key={i} 
                 className={`next-row ${song.videoId === s.videoId ? 'active' : ''}`}
                 onClick={() => onPlaySong(s)}
               >
-                <img src={s.thumbnail} alt="" />
+                <div className="img-wrap">
+                  <img src={s.thumbnail} alt="" />
+                  {song.videoId === s.videoId && <div className="playing-overlay"><Music2 size={16} /></div>}
+                </div>
                 <div className="txt">
                   <p className="t">{s.title}</p>
                   <p className="a">{s.artist}</p>
                 </div>
-                <MoreVertical size={16} />
+                <MoreVertical size={18} className="more-icon" />
               </div>
             ))}
           </div>
