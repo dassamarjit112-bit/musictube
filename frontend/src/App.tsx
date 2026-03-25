@@ -50,6 +50,31 @@ function App() {
   const [downloads, setDownloads] = useState<Song[]>([]);
   const [activeChip, setActiveChip] = useState<string | null>(null);
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const silentRef = useRef<HTMLAudioElement | null>(null);
+
+  // Android Background Play Persistence
+  useEffect(() => {
+    if (isPlaying) {
+      if (!silentRef.current) {
+        silentRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+'); 
+        silentRef.current.loop = true;
+      }
+      silentRef.current.play().catch(e => console.warn("Silent audio blocked", e));
+    } else {
+      silentRef.current?.pause();
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
+    const handleVisible = () => {
+      // If we come back and it should be playing but yt-player is paused, resume it.
+      if (document.visibilityState === 'visible' && isPlaying) {
+        ytPlayer.play();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => document.removeEventListener('visibilitychange', handleVisible);
+  }, [isPlaying, ytPlayer]);
 
   const currentSongRef = useRef(currentSong);
   currentSongRef.current = currentSong;
@@ -132,7 +157,11 @@ function App() {
     navigator.mediaSession.setActionHandler("seekforward", () => {
       ytPlayer.seekTo(Math.min(duration, playedSeconds + 10));
     });
-  }, [currentSong, ytPlayer, playedSeconds, duration]);
+    
+    // Smooth Android Playback
+    if (isPlaying) navigator.mediaSession.playbackState = 'playing';
+    else navigator.mediaSession.playbackState = 'paused';
+  }, [currentSong, ytPlayer, playedSeconds, duration, isPlaying]);
 
   // Supabase Auth Listener
   useEffect(() => {
