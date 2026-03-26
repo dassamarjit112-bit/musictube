@@ -7,11 +7,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Setup Flutter
+            - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0' # This fixes the SDK version error
+          # Use a version that matches or exceeds your code requirements
+          flutter-version: '3.24.0' 
           channel: 'stable'
+
       
       - name: Install dependencies
         run: |
