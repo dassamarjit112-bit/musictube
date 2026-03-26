@@ -7,7 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-            - name: Setup Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           # Use a version that matches or exceeds your code requirements
