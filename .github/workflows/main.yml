@@ -5,15 +5,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4 # Updated to v4
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          # Use a version that matches or exceeds your code requirements
-          flutter-version: '3.24.0' 
+          # Using a modern version to satisfy flutter_lints ^6.0.0
+          flutter-version: '3.27.0' 
           channel: 'stable'
-
+          cache: true # Speeds up future builds
       
       - name: Install dependencies
         run: |
@@ -26,7 +26,7 @@ jobs:
           flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4 # Updated to v4 for better reliability
+        uses: actions/upload-artifact@v4
         with:
-          name: release-apk
+          name: YouTube-Music-Fixed
           path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
