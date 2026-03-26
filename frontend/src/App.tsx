@@ -1117,6 +1117,17 @@ function App() {
                       </div>
                     </div>
 
+                    <div className="menu-group sub-info">
+                      <h3>App Downloads</h3>
+                      <div className="sub-card" style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                        <p>Get the Native Android App</p>
+                        <span className="price">Full Background Play & Controls</span>
+                        <a href="/ytmusic.apk" download className="sub-btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', background: '#3b82f6', color: '#fff', marginTop: '12px' }}>
+                          Download APK
+                        </a>
+                      </div>
+                    </div>
+
                     <button className="sign-out-btn" onClick={handleLogout}>Sign Out</button>
                   </div>
                 </div>
