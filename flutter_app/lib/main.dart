@@ -1,8 +1,15 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
+// THIS FIXES THE "BLACK PAGE" FOR VITE APPS
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Create a local server to serve assets over http://localhost for ESM support
+  final InAppLocalServer localServer = InAppLocalServer(port: 8080);
+  await localServer.start();
+
   runApp(const MaterialApp(
     debugShowCheckedModeBanner: false,
     home: YTMApp(),
@@ -22,8 +29,10 @@ class _YTMAppState extends State<YTMApp> {
       backgroundColor: Colors.black,
       body: SafeArea(
         child: InAppWebView(
-          // Pointing to our local assets folder
-          initialFile: "assets/www/index.html",
+          // Load the local server URL instead of a file URI
+          initialUrlRequest: URLRequest(
+            url: WebUri("http://localhost:8080/assets/www/index.html"), 
+          ),
           initialSettings: InAppWebViewSettings(
             mediaPlaybackRequiresUserGesture: false,
             allowsInlineMediaPlayback: true,
@@ -32,21 +41,11 @@ class _YTMAppState extends State<YTMApp> {
             useOnLoadResource: true,
             cacheEnabled: true,
             domStorageEnabled: true,
-            // Android-specific fixes for local file loading / black page
-            mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
-            allowFileAccessFromFileURLs: true,
-            allowUniversalAccessFromFileURLs: true,
-            // Support for ESM (Vite modules)
             javaScriptEnabled: true,
+            mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
           ),
-          onWebViewCreated: (controller) {
-            // controller.setSettings(settings: settings);
-          },
-          onLoadError: (controller, url, code, message) {
-            print("Page Load Error: $message");
-          },
           onConsoleMessage: (controller, consoleMessage) {
-            print("JS Console: ${consoleMessage.message}");
+            print("VITE CONSOLE: ${consoleMessage.message}");
           },
         ),
       ),

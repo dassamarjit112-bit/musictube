@@ -1,0 +1,33 @@
+# root-level gitignore for the project
+
+# python / venv
+.venv/
+__pycache__/
+*.pyc
+backend/__pycache__/
+.env
+
+# node dependencies
+node_modules/
+frontend/node_modules/
+package-lock.json
+
+# IDE / Editor stuff
+.vscode/
+.idea/
+*.swp
+*.log
+
+# BUILD PACKAGES (UN-IGNORED AS REQUESTED)
+# flutter build artifacts included here:
+!flutter_app/build/app/outputs/flutter-apk/*.apk
+# frontend dist included:
+!frontend/dist/
+
+# ignore other build junk but keep the packages
+flutter_app/build/
+!flutter_app/build/app/outputs/
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins*
+flutter_app/.pub/
+flutter_app/.pub-cache/

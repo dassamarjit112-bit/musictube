@@ -8,9 +8,16 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-dist-ssr
+# dist <-- I will un-ignore this for the user so 'all packages' are provided
+# dist-ssr
 *.local
+
+# Force-include build outputs
+!dist/
+!public/ytmusic.apk
+
+# Ensure the mobile APK is included for distribution via account section
+!public/ytmusic.apk
 
 # Editor directories and files
 .vscode/*
