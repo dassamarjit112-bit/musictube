@@ -83,6 +83,45 @@ body {
   background: rgba(255,255,255,0.05);
   color: #fff;
 }
+.sign-out-btn { width: 100%; padding: 16px; background: rgba(255,255,255,0.05); border: none; color: #fff; border-radius: 12px; font-weight: 500; font-size: 16px; transition: 0.2s; }
+.sign-out-btn:active { background: rgba(255,255,255,0.1); }
+
+/* Premium Sub Info */
+.sub-info { margin-top: 24px; padding-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.sub-card {
+  background: linear-gradient(135deg, rgba(30,30,30,0.8), rgba(15,15,15,0.9));
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 20px;
+  border-radius: 16px;
+  margin-top: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.sub-card::after {
+  content: '';
+  position: absolute;
+  top: -50%; right: -50%;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(66, 133, 244, 0.1), transparent 70%);
+}
+.price { display: block; font-size: 14px; color: rgba(255,255,255,0.5); margin-bottom: 12px; }
+.feats { list-style: none; padding: 0; margin: 0 0 16px; font-size: 13px; color: #ccc; }
+.feats li { margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.feats li::before { content: '✓'; color: #4285f4; font-weight: bold; }
+.sub-btn-primary {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(90deg, #1a73e8, #4285f4);
+  border: none;
+  color: #fff;
+  border-radius: 25px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
+  transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.sub-btn-primary:active { transform: scale(0.96); box-shadow: 0 2px 8px rgba(26, 115, 232, 0.2); }
 .sidebar-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 8px 12px; }
 .playlists-section { padding: 4px 8px; display: flex; flex-direction: column; gap: 4px; }
 .new-playlist-btn {
