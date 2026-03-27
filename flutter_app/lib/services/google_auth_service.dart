@@ -1,5 +1,5 @@
-import 'package:package:ytm_clone/services/google_auth_service.dart';
-import 'package:http/http.dart' as http;
+import 'package:google_sign_in/google_sign_in.dart';
+// Remove any line that says: import 'package:package:ytm_clone/services/google_auth_service.dart';
 
 class GoogleAuthService {
   // Use the CLIENT ID from the "Web Application" type in Google Console
@@ -13,17 +13,13 @@ class GoogleAuthService {
       
       if (googleUser != null) {
         final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        
-        // This is the "Passport" you send to your Node.js/Vercel backend
         final String? idToken = googleAuth.idToken;
 
-        print("Token obtained: $idToken");
-
-        // Now send this to your backend to verify the user
-        // await sendTokenToBackend(idToken);
+        debugPrint("Token obtained: $idToken");
+        // Add your logic to send to backend here
       }
     } catch (error) {
-      print("Login Failed: $error");
+      debugPrint("Login Failed: $error");
     }
   }
 }
