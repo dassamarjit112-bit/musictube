@@ -34,11 +34,18 @@ jobs:
           flutter pub get
 
       - name: Build APK
-        run: |
+       run: |
           cd flutter_app
-          flutter -h
-          # 3. Build while ignoring icon errors and bypassing the URI bug
-          flutter build apk --release 
+          # Remove any leftover build artifacts manually
+          rm -rf build/
+          rm -f .dart_tool/package_config.json
+          
+          # Rebuild the dependency map
+          flutter pub get
+          
+          # Run the build with a fresh start
+          flutter build apk --release --no-tree-shake-icons
+ 
           
       - name: Upload APK
         uses: actions/upload-artifact@v4
