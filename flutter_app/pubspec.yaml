@@ -25,8 +25,7 @@ flutter:
   # Ensure your assets are indented exactly like this (2 spaces)
   # assets:
   #   - assets/images/
-  
-dependencies:
+
   google_sign_in: ^6.2.1
   http: ^1.1.0 # To send the token to your backend
   
