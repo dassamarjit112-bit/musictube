@@ -55,12 +55,13 @@ export function Auth({ onLogin }: AuthProps) {
   };
 
   const triggerNativeGoogleLogin = () => {
-    if ((window as any).FlutterAuth) {
-      (window as any).FlutterAuth.postMessage('triggerGoogleLogin');
-    } else {
-      alert("Native bridge not found. Are you running in the Flutter app?");
-    }
-  };
+  // InAppWebView uses a different syntax for handlers:
+  if ((window as any).flutter_inappwebview) {
+    (window as any).flutter_inappwebview.callHandler('FlutterAuth', 'triggerGoogleLogin');
+  } else {
+    alert("Native bridge not found. Are you running in the Flutter app?");
+  }
+};
 
   const handleSupabaseGoogleLogin = async () => {
     setLoading(true);
