@@ -21,10 +21,49 @@ export function Auth({ onLogin }: AuthProps) {
       /wv/i.test(userAgent) || 
       /flutter/i.test(userAgent) || 
       (window as any).flutter_inappwebview !== undefined ||
-      window.location.port === '8080'; // The Flutter App's Dart server runs on port 8080
+      window.location.port === '8080'; 
     
     setIsFlutterApp(isWebView);
+
+    // Listen for the native login success from Flutter
+    (window as any).onNativeLoginSuccess = (userData: any) => {
+      handleNativeSuccess(userData);
+    };
   }, []);
+
+  // New function to handle data returned from the Flutter Native side
+  const handleNativeSuccess = async (userData: any) => {
+    setLoading(true);
+    try {
+      // Upsert into Supabase profiles
+      const { error } = await supabase.from('profiles').upsert({
+        id: userData.id,
+        email: userData.email,
+        full_name: userData.full_name,
+        avatar_url: userData.avatar_url,
+      });
+
+      if (error) throw error;
+
+      localStorage.setItem('ytm_user', JSON.stringify(userData));
+      onLogin(userData); 
+    } catch (err) {
+      console.error("Native login sync failed:", err);
+      alert('Syncing native login failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 1. Add this function inside your Auth component to handle the Flutter bridge
+  const triggerNativeGoogleLogin = () => {
+    if ((window as any).FlutterAuth) {
+      // This calls the 'FlutterAuth' channel we will set up in Dart
+      (window as any).FlutterAuth.postMessage('triggerGoogleLogin');
+    } else {
+      alert("Native bridge not found. Are you running in the Flutter app?");
+    }
+  };
 
   // 1. SUPABASE GOOGLE AUTH (For standard Web App)
   const handleSupabaseGoogleLogin = async () => {
@@ -40,10 +79,9 @@ export function Auth({ onLogin }: AuthProps) {
       alert(error.message);
       setLoading(false);
     }
-    // Supabase handles the redirection automatically
   };
 
-  // 2. DIRECT CLIENT ID GOOGLE AUTH (For Flutter Mobile App)
+  // 2. DIRECT CLIENT ID GOOGLE AUTH (Existing logic kept for compatibility)
   const handleDirectGoogleLoginSuccess = async (response: any) => {
     setLoading(true);
     try {
@@ -55,13 +93,11 @@ export function Auth({ onLogin }: AuthProps) {
         avatar_url: decoded.picture,
       };
 
-      // Upsert direct into profiles table
       const { error } = await supabase.from('profiles').upsert(userData);
       if (error) throw error;
 
-      // Update state to trigger smooth redirect to home
       localStorage.setItem('ytm_user', JSON.stringify(userData));
-      onLogin(userData); // This logs the user in instantly
+      onLogin(userData);
 
     } catch (err) {
       console.error("Login verification failed:", err);
@@ -97,22 +133,33 @@ export function Auth({ onLogin }: AuthProps) {
           ) : (
             <>
               {isFlutterApp ? (
-                /* FLUTTER APP PATH */
+                /* 2. In your JSX, update the Flutter App Path: */
                 <div className="direct-google-auth" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <p style={{ fontSize: '13px', color: '#666', marginBottom: '16px', textAlign: 'center' }}>
                     Native App Authentication
                   </p>
-                  <GoogleOAuthProvider clientId={ANDROID_CLIENT_ID}>
-                    <GoogleLogin
-                      onSuccess={handleDirectGoogleLoginSuccess}
-                      onError={() => alert('App Sign-In failed')}
-                      useOneTap
-                      theme="filled_black"
-                      shape="pill"
-                      size="large"
-                      width="300"
-                    />
-                  </GoogleOAuthProvider>
+                  <button
+                    onClick={triggerNativeGoogleLogin}
+                    className="google-signin-btn"
+                    style={{ 
+                      background: '#fff', 
+                      color: '#000', 
+                      border: '1px solid #dadce0', 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      justifyContent: 'center', 
+                      padding: '12px', 
+                      borderRadius: '24px', 
+                      width: '300px', 
+                      margin: '0 auto', 
+                      fontSize: '15px',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" alt="G" style={{ width: '18px', marginRight: '10px' }} />
+                    Sign in with Google
+                  </button>
                 </div>
               ) : (
                 /* WEB APP PATH */
@@ -122,7 +169,7 @@ export function Auth({ onLogin }: AuthProps) {
                     className="google-signin-btn"
                     style={{ background: '#111', color: '#fff', border: '1px solid #333', display: 'flex', justifyContent: 'center', padding: '12px', borderRadius: '24px', width: '300px', margin: '0 auto', fontSize: '15px' }}
                   >
-                    <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" style={{ width: '20px', height: '20px', background: '#fff', borderRadius: '50%', padding: '2px', marginRight: '8px' }} />
+                    <img src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" alt="Google" style={{ width: '20px', height: '20px', background: '#fff', borderRadius: '50%', padding: '2px', marginRight: '8px' }} />
                     Sign in with Google
                   </button>
                 </div>
@@ -139,7 +186,6 @@ export function Auth({ onLogin }: AuthProps) {
           By signing in, you agree to the Terms of Service. Your account information will be stored securely.
         </p>
 
-        {/* Helper debug text to verify platform logic */}
         <p style={{ fontSize: '10px', color: '#ccc', textAlign: 'center', marginTop: '20px' }}>
           Running Mode: {isFlutterApp ? 'Flutter Mobile App' : 'Browser Web App'}
         </p>
