@@ -28,7 +28,14 @@ function App() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('ytm_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
@@ -205,26 +212,14 @@ function App() {
     else navigator.mediaSession.playbackState = 'paused';
   }, [currentSong, ytPlayer, playedSeconds, duration, isPlaying]);
 
-  // Supabase Auth Listener
+  // App Session Listener
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchFavorites(session.user.id);
-        fetchHistory(session.user.id);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchFavorites(session.user.id);
-        fetchHistory(session.user.id);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    if (user?.id) {
+      console.log("👤 Session Active:", user.full_name);
+      fetchFavorites(user.id);
+      fetchHistory(user.id);
+    }
+  }, [user?.id]);
 
   // Sync session loading
   const isLoggedIn = !!user;
@@ -539,11 +534,13 @@ function App() {
 
   // ─── Login Screen ────────────────────────────────────────────────────────────
   if (!isLoggedIn) {
-    return <Auth />;
+    return <Auth onLogin={setUser} />;
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
+    localStorage.removeItem("ytm_user");
+    setUser(null);
+    setView({ name: "home" });
   };
 
   // ─── Main App ────────────────────────────────────────────────────────────────
@@ -671,7 +668,9 @@ function App() {
           <MoreVertical size={24} />
         </button>
             <button className="cast-btn" onClick={() => setView({ name: 'account' })} title="Account"><Tv size={20} /></button>
-            <div className="avatar" onClick={() => setView({ name: 'account' })}>{user?.email?.[0].toUpperCase()}</div>
+            <div className="avatar" onClick={() => setView({ name: 'account' })} style={user?.avatar_url ? { backgroundImage: `url(${user.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center', color: 'transparent' } : {}}>
+              {!user?.avatar_url && (user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}
+            </div>
           </div>
         </header>
 
@@ -1072,9 +1071,17 @@ function App() {
               {view.name === "account" && (
                 <div className="account-view">
                   <div className="account-header-v2">
-                    <div className="a-avatar">{user?.email?.[0].toUpperCase()}</div>
+                    {user?.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt={user.full_name}
+                        style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div className="a-avatar">{(user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}</div>
+                    )}
                     <div className="a-info">
-                      <h2>{user?.email?.split('@')[0]}</h2>
+                      <h2>{user?.full_name || user?.email?.split('@')[0]}</h2>
                       <p>{user?.email}</p>
                       <button className="manage-acc">Manage Google Account</button>
                     </div>
