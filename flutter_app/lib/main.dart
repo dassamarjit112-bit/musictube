@@ -71,7 +71,43 @@ class YTMApp extends StatefulWidget {
 class _YTMAppState extends State<YTMApp> {
   final GoogleAuthService _authService = GoogleAuthService();
   InAppWebViewController? _webViewController;
+// Inside your State class where the WebView is initialized
+late final WebViewController _controller;
 
+@override
+void initState() {
+  super.initState();
+  _controller = WebViewController()
+    ..setJavaScriptMode(JavaScriptMode.unrestricted)
+    // Create the channel named 'FlutterAuth'
+    ..addJavaScriptChannel(
+      'FlutterAuth',
+      onMessageReceived: (JavaScriptMessage message) {
+        if (message.message == 'triggerGoogleLogin') {
+          _handleNativeGoogleSignIn();
+        }
+      },
+    )
+    ..loadRequest(Uri.parse('YOUR_WEB_APP_URL'));
+}
+
+Future<void> _handleNativeGoogleSignIn() async {
+  try {
+    final GoogleSignIn _googleSignIn = GoogleSignIn();
+    final GoogleSignInAccount? account = await _googleSignIn.signIn();
+    
+    if (account != null) {
+      // Send the user data back to React
+      final String userJson = '{"email": "${account.email}", "full_name": "${account.displayName}", "id": "${account.id}", "avatar_url": "${account.photoUrl}"}';
+      
+      // Call a function you define in React to handle the result
+      await _controller.runJavaScript('window.onNativeLoginSuccess($userJson)');
+    }
+  } catch (error) {
+    print("Google Sign-In Error: $error");
+  }
+}
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
