@@ -1,4 +1,4 @@
-Import 'package:google_sign_in/google_sign_in.dart';
+import 'package:package:ytm_clone/services/google_auth_service.dart';
 import 'package:http/http.dart' as http;
 
 class GoogleAuthService {
