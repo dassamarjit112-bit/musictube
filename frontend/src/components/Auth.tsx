@@ -33,30 +33,24 @@ export function Auth() {
     <div className="google-auth-page">
       <motion.div 
         className="google-auth-card"
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       >
         <div className="google-header">
-          <svg className="google-logo" viewBox="0 0 24 24" width="75" height="24">
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" fill="none" stroke="currentColor" strokeWidth="2"/>
-            <rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor"/>
-          </svg>
           <div className="google-brand">
-            <span style={{color: '#4285F4'}}>G</span>
-            <span style={{color: '#EA4335'}}>o</span>
-            <span style={{color: '#FBBC05'}}>o</span>
-            <span style={{color: '#4285F4'}}>g</span>
-            <span style={{color: '#34A853'}}>l</span>
-            <span style={{color: '#EA4335'}}>e</span>
+            <svg viewBox="0 0 24 24" width="36" height="36">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" fill="#f00"/>
+            </svg>
+            <span style={{color: '#fff', fontSize: '26px', fontWeight: '800', letterSpacing: '-1px'}}>Music</span>
           </div>
-          <h1>{isSignUp ? 'Create a Google Account' : 'Sign in'}</h1>
+          <h1>{isSignUp ? 'Create your account' : 'Sign in'}</h1>
           <p>to continue to YouTube Music</p>
         </div>
 
         <button onClick={signInWithGoogle} className="google-signin-btn">
-          <img src="https://www.google.com/favicon.ico" alt="Google icon" />
-          Continue with Google
+          <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" style={{width: '24px', height: '24px'}} />
+          Sign in with Google
         </button>
 
         <div className="auth-divider">
@@ -92,7 +86,7 @@ export function Auth() {
               {isSignUp ? 'Sign in instead' : 'Create account'}
             </button>
             <button type="submit" className="blue-btn" disabled={loading}>
-              {loading ? '...' : 'Next'}
+              {loading ? 'Wait...' : 'Next'}
             </button>
           </div>
         </form>
