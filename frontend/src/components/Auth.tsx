@@ -1,21 +1,17 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'framer-motion';
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import { jwtDecode } from 'jwt-decode';
 
 interface AuthProps {
   onLogin: (user: any) => void;
 }
-
-const ANDROID_CLIENT_ID = "79361906244-0umpdsl6bk6grunhuotbe5qhhb2911uf.apps.googleusercontent.com";
 
 export function Auth({ onLogin }: AuthProps) {
   const [loading, setLoading] = useState(false);
   const [isFlutterApp, setIsFlutterApp] = useState(false);
 
   useEffect(() => {
-    // Strictly detect if running inside a Flutter WebView or Android WebView
+    // Detect platform
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
     const isWebView = 
       /wv/i.test(userAgent) || 
@@ -29,13 +25,16 @@ export function Auth({ onLogin }: AuthProps) {
     (window as any).onNativeLoginSuccess = (userData: any) => {
       handleNativeSuccess(userData);
     };
+
+    // Cleanup global function on unmount
+    return () => {
+      delete (window as any).onNativeLoginSuccess;
+    };
   }, []);
 
-  // New function to handle data returned from the Flutter Native side
   const handleNativeSuccess = async (userData: any) => {
     setLoading(true);
     try {
-      // Upsert into Supabase profiles
       const { error } = await supabase.from('profiles').upsert({
         id: userData.id,
         email: userData.email,
@@ -55,17 +54,14 @@ export function Auth({ onLogin }: AuthProps) {
     }
   };
 
-  // 1. Add this function inside your Auth component to handle the Flutter bridge
   const triggerNativeGoogleLogin = () => {
     if ((window as any).FlutterAuth) {
-      // This calls the 'FlutterAuth' channel we will set up in Dart
       (window as any).FlutterAuth.postMessage('triggerGoogleLogin');
     } else {
       alert("Native bridge not found. Are you running in the Flutter app?");
     }
   };
 
-  // 1. SUPABASE GOOGLE AUTH (For standard Web App)
   const handleSupabaseGoogleLogin = async () => {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
@@ -77,32 +73,6 @@ export function Auth({ onLogin }: AuthProps) {
 
     if (error) {
       alert(error.message);
-      setLoading(false);
-    }
-  };
-
-  // 2. DIRECT CLIENT ID GOOGLE AUTH (Existing logic kept for compatibility)
-  const handleDirectGoogleLoginSuccess = async (response: any) => {
-    setLoading(true);
-    try {
-      const decoded: any = jwtDecode(response.credential);
-      const userData = {
-        id: decoded.sub,
-        email: decoded.email,
-        full_name: decoded.name,
-        avatar_url: decoded.picture,
-      };
-
-      const { error } = await supabase.from('profiles').upsert(userData);
-      if (error) throw error;
-
-      localStorage.setItem('ytm_user', JSON.stringify(userData));
-      onLogin(userData);
-
-    } catch (err) {
-      console.error("Login verification failed:", err);
-      alert('Google Login failed.');
-    } finally {
       setLoading(false);
     }
   };
@@ -133,7 +103,6 @@ export function Auth({ onLogin }: AuthProps) {
           ) : (
             <>
               {isFlutterApp ? (
-                /* 2. In your JSX, update the Flutter App Path: */
                 <div className="direct-google-auth" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <p style={{ fontSize: '13px', color: '#666', marginBottom: '16px', textAlign: 'center' }}>
                     Native App Authentication
@@ -162,7 +131,6 @@ export function Auth({ onLogin }: AuthProps) {
                   </button>
                 </div>
               ) : (
-                /* WEB APP PATH */
                 <div className="supabase-google-auth" style={{ width: '100%' }}>
                   <button
                     onClick={handleSupabaseGoogleLogin}
