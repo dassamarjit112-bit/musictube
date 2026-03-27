@@ -34,7 +34,7 @@ jobs:
           flutter pub get
 
       - name: Build APK
-       run: |
+        run: | 
           cd flutter_app
           
           # Run the build with a fresh start
