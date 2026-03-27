@@ -26,6 +26,5 @@ flutter:
   # assets:
   #   - assets/images/
 
-  google_sign_in: ^6.2.1
-  http: ^1.1.0 # To send the token to your backend
+
   
