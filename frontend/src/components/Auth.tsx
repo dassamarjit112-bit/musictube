@@ -15,13 +15,15 @@ export function Auth({ onLogin }: AuthProps) {
   const [isFlutterApp, setIsFlutterApp] = useState(false);
 
   useEffect(() => {
-    // Detect if running inside a Flutter WebView or an Android environment
+    // Strictly detect if running inside a Flutter WebView or Android WebView
+    // Do NOT trigger just because it's a mobile device (e.g. Chrome on Android)
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-    const isMobileDevice = /android|iphone|ipad|ipod/i.test(userAgent);
-    const isWebView = /wv|flutter/i.test(userAgent) || (window as any).flutter_inappwebview !== undefined;
-
-    // Set to true if it is a mobile device and/or webview.
-    setIsFlutterApp(isMobileDevice || isWebView);
+    const isWebView = 
+      /wv/i.test(userAgent) || 
+      /flutter/i.test(userAgent) || 
+      (window as any).flutter_inappwebview !== undefined;
+    
+    setIsFlutterApp(isWebView);
   }, []);
 
   // 1. SUPABASE GOOGLE AUTH (For standard Web App)
