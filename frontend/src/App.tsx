@@ -235,7 +235,7 @@ function App() {
         fetchHistory(u.id);
       }
     });
-  }, []);
+  }, [user?.id]);
 
 
   // Sync session loading
