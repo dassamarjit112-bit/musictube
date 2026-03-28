@@ -242,15 +242,14 @@ function App() {
   // Sync session loading
   const isLoggedIn = !!user;
 
-  // Fetch data on tab change
+  // Fetch data on tab change (Allow even if not logged in for Home/Explore)
   useEffect(() => {
-    if (!isLoggedIn) return;
     if (view.name === "home" && homeData.length === 0) fetchHome();
     if (view.name === "explore" && exploreData.length === 0) fetchExplore();
     if (view.name === "artist") fetchArtist((view as any).id);
     if (view.name === "album") fetchAlbum((view as any).id);
     if (view.name === "playlist") fetchPlaylist((view as any).id);
-  }, [isLoggedIn, view.name, (view as any).id]);
+  }, [view.name, (view as any).id]);
 
   // Autostart first song from home feed if none selected
   useEffect(() => {
@@ -551,9 +550,7 @@ function App() {
   };
 
   // ─── Login Screen ────────────────────────────────────────────────────────────
-  if (!isLoggedIn) {
-    return <Auth onLogin={setUser} />;
-  }
+  // Removed strict login wall to allow Guest browsing
 
   const handleLogout = () => {
     localStorage.removeItem("ytm_user");
@@ -594,7 +591,7 @@ function App() {
             <Compass size={24} /> <span>Explore</span>
           </button>
           <button 
-            onClick={() => navigateTo({ name: "library" })} 
+            onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })} 
             className={view.name === "library" ? "active" : ""}
           >
             <Library size={24} /> <span>Library</span>
@@ -685,10 +682,13 @@ function App() {
         >
           <MoreVertical size={24} />
         </button>
-            <button className="cast-btn" onClick={() => setView({ name: 'account' })} title="Account"><Tv size={20} /></button>
-            <div className="avatar" onClick={() => setView({ name: 'account' })} style={user?.avatar_url ? { backgroundImage: `url(${user.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center', color: 'transparent' } : {}}>
-              {!user?.avatar_url && (user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}
-            </div>
+            {isLoggedIn ? (
+              <div className="avatar" onClick={() => setView({ name: 'account' })} style={user?.avatar_url ? { backgroundImage: `url(${user.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center', color: 'transparent' } : {}}>
+                {!user?.avatar_url && (user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}
+              </div>
+            ) : (
+              <button className="sign-in-btn-sm" onClick={() => setView({ name: 'account' })}>Sign In</button>
+            )}
           </div>
         </header>
 
@@ -1092,73 +1092,60 @@ function App() {
               {/* ── ACCOUNT ── */}
               {view.name === "account" && (
                 <div className="account-view">
-                  <div className="account-header-v2">
-                    {user?.avatar_url ? (
-                      <img
-                        src={user.avatar_url}
-                        alt={user.full_name}
-                        style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div className="a-avatar">{(user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}</div>
-                    )}
-                    <div className="a-info">
-                      <h2>{user?.full_name || user?.email?.split('@')[0]}</h2>
-                      <p>{user?.email}</p>
-                      <button className="manage-acc">Manage Google Account</button>
+                  {!isLoggedIn ? (
+                    <div className="guest-login-zone">
+                      <Auth onLogin={setUser} />
                     </div>
-                  </div>
-                  
-                  <div className="account-menu">
-                    <div className="menu-group">
-                      <div className="menu-item premium" onClick={() => {}}>
-                        <div className="icon"><Play size={20} fill="#f00" /></div>
-                        <div className="txt">
-                          <h3>Get Music Premium</h3>
-                          <p>Try it free for 1 month</p>
+                  ) : (
+                    <>
+                      <div className="account-header-v2">
+                        {user?.avatar_url ? (
+                          <img
+                            src={user.avatar_url}
+                            alt={user.full_name}
+                            className="avatar-img-bg"
+                          />
+                        ) : (
+                          <div className="a-avatar">{(user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}</div>
+                        )}
+                        <div className="a-info">
+                          <h2>{user?.full_name || user?.email?.split('@')[0]}</h2>
+                          <p>{user?.email}</p>
+                          <button className="manage-acc">Manage Google Account</button>
+                          <button className="logout-btn-sh" onClick={handleLogout}>Logout</button>
                         </div>
                       </div>
-                    </div>
+                      
+                      <div className="account-menu">
+                        <div className="menu-group">
+                          <div className="menu-item premium" onClick={() => {}}>
+                            <div className="icon"><Play size={20} fill="#f00" /></div>
+                            <div className="txt">
+                              <h3>Get Music Premium</h3>
+                              <p>Try it free for 1 month</p>
+                            </div>
+                          </div>
+                        </div>
 
-                    <div className="menu-group">
-                      <div className="menu-item" onClick={() => setView({ name: 'library' })}>
-                        <div className="icon"><Library size={20} /></div>
-                        <span>Your Library</span>
-                      </div>
-                      <div className="menu-item" onClick={() => setView({ name: 'explore' })}>
-                        <div className="icon"><Compass size={20} /></div>
-                        <span>History & Charts</span>
-                      </div>
-                    </div>
+                        <div className="menu-group">
+                          <div className="menu-item" onClick={() => navigateTo({ name: 'library' })}>
+                            <div className="icon"><Library size={20} /></div>
+                            <span>Your Library</span>
+                          </div>
+                        </div>
 
-                    <div className="menu-group sub-info">
-                      <h3>Subscriptions (BETA)</h3>
-                      <div className="sub-card">
-                        <div className="badge">Limited Offer</div>
-                        <p>Lifetime Premium Access</p>
-                        <span className="price">One-time payment</span>
-                        <ul className="feats">
-                          <li>Offline Downloads (Experimental)</li>
-                          <li>Background Playback</li>
-                          <li>No Ads</li>
-                        </ul>
-                        <button className="sub-btn-primary">Buy Now (Coming Soon)</button>
+                        <div className="menu-group app-dl">
+                          <p>Native Mobile Experience</p>
+                          <div className="sub-card" style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '16px', borderRadius: '12px' }}>
+                            <span className="price">Full Background Play & Controls</span>
+                            <a href="/ytmusic.apk" download className="sub-btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', background: '#3b82f6', color: '#fff', marginTop: '12px', padding: '8px', borderRadius: '8px' }}>
+                              Download APK
+                            </a>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="menu-group sub-info">
-                      <h3>App Downloads</h3>
-                      <div className="sub-card" style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-                        <p>Get the Native Android App</p>
-                        <span className="price">Full Background Play & Controls</span>
-                        <a href="/ytmusic.apk" download className="sub-btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', background: '#3b82f6', color: '#fff', marginTop: '12px' }}>
-                          Download APK
-                        </a>
-                      </div>
-                    </div>
-
-                    <button className="sign-out-btn" onClick={handleLogout}>Sign Out</button>
-                  </div>
+                    </>
+                  )}
                 </div>
               )}
             </motion.div>
