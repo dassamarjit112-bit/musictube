@@ -36,6 +36,7 @@ function App() {
       return null;
     }
   });
+  
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
