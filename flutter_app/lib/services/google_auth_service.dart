@@ -7,28 +7,31 @@ class GoogleAuthService {
     serverClientId: '79361906244-0umpdsl6bk6grunhuotbe5qhhb2911uf.apps.googleusercontent.com',
   );
 
-  Future<void> handleSignIn() async {
-    try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+// lib/services/google_auth_service.dart
+Future<Map<String, dynamic>?> handleSignIn() async {
+  try {
+    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+    if (googleUser != null) {
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       
-      if (googleUser != null) {
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        final String? idToken = googleAuth.idToken;
-        final String? accessToken = googleAuth.accessToken;
+      // Sync with Supabase
+      final AuthResponse res = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: googleAuth.idToken!,
+        accessToken: googleAuth.accessToken,
+      );
 
-        if (idToken == null) throw 'No ID Token found.';
-
-        // --- THE MISSING STEP: SYNC WITH SUPABASE ---
-        await Supabase.instance.client.auth.signInWithIdToken(
-  provider: OAuthProvider.google,
-  idToken: googleAuth.idToken!,
-  accessToken: googleAuth.accessToken,
-);
-
-        debugPrint("Supabase Profile Created/Synced Successfully!");
-      }
-    } catch (error) {
-      debugPrint("Login Sync Failed: $error");
+      // Return the user details to main.dart
+      return {
+        "id": res.user?.id,
+        "email": res.user?.email,
+        "full_name": googleUser.displayName,
+        "avatar_url": googleUser.photoUrl,
+      };
     }
+  } catch (error) {
+    debugPrint("Login Failed: $error");
   }
+  return null;
 }
+  
