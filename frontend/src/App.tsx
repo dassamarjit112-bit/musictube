@@ -738,6 +738,8 @@ function App() {
                                 setView({ name: "artist", id: item.browseId } as any);
                               } else if (item.type === "album" && item.browseId) {
                                 setView({ name: "album", id: item.browseId } as any);
+                              } else if (item.type === "playlist" && (item.playlistId || item.browseId)) {
+                                setView({ name: "playlist", id: item.playlistId || item.browseId } as any);
                               }
                             }}
                           >
@@ -973,6 +975,8 @@ function App() {
                                 setView({ name: "artist", id: item.browseId } as any);
                               } else if (item.type === "album" && item.browseId) {
                                 setView({ name: "album", id: item.browseId } as any);
+                              } else if (item.type === "playlist" && (item.playlistId || item.browseId)) {
+                                setView({ name: "playlist", id: item.playlistId || item.browseId } as any);
                               }
                           }}
                         >

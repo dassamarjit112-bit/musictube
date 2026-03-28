@@ -166,20 +166,19 @@ def search():
 
 @app.route("/api/home")
 def home():
+    sections = []
     try:
-        # get_home() works best with authentication
+        # get_home() works best with authentication, may fail without it
         results = yt.get_home(limit=8)
-        sections = []
         for section in results:
             title = section.get("title", "")
             contents = section.get("contents", [])
             items = []
             for item in contents:
-                # Guess resultType if missing
                 t = item.get("resultType", "")
                 if not t:
                     if "videoId" in item: t = "song"
-                    elif "category" in item: continue # skip category labels
+                    elif "category" in item: continue
                     elif "subscribers" in item: t = "artist"
                     elif "year" in item: t = "album"
                     elif "playlistId" in item: t = "playlist"
@@ -188,40 +187,35 @@ def home():
                         elif "artists" in item: t = "album"
                         else: t = "artist"
 
-                if t in ("song", "video"):
-                    items.append(fmt_song(item))
-                elif t == "artist":
-                    items.append(fmt_artist(item))
-                elif t == "album":
-                    items.append(fmt_album(item))
-                elif t == "playlist":
-                    items.append(fmt_playlist(item))
+                if t in ("song", "video"): items.append(fmt_song(item))
+                elif t == "artist": items.append(fmt_artist(item))
+                elif t == "album": items.append(fmt_album(item))
+                elif t == "playlist": items.append(fmt_playlist(item))
             
             if items:
                 sections.append({"title": title, "items": items})
-        
-        # If no sections, try to get charts as fallback
-        if not sections:
-            try:
-                charts_data = yt.get_charts(country="ZZ")
-                if "songs" in charts_data:
-                    song_items = limit_items(charts_data["songs"].get("items", []), 12)
-                    sections.append({
-                        "title": "Top Songs",
-                        "items": [fmt_song(s) for s in song_items]
-                    })
-                if "trending" in charts_data:
-                    trending_items = limit_items(charts_data["trending"].get("items", []), 12)
-                    sections.append({
-                        "title": "Trending",
-                        "items": [fmt_song(s) for s in trending_items]
-                    })
-            except: pass
-
-        return jsonify({"sections": sections})
     except Exception as e:
-        print(f"Home error: {e}")
-        return jsonify({"error": str(e)}), 500
+        print(f"get_home failed: {e}")
+
+    # Always try to append a 'Global Charts' section if results are sparse
+    if len(sections) < 3:
+        try:
+            charts_data = yt.get_charts(country="ZZ")
+            if "songs" in charts_data and not any(s["title"] == "Top Songs" for s in sections):
+                song_items = limit_items(charts_data["songs"].get("items", []), 12)
+                sections.append({"title": "Global Top Songs", "items": [fmt_song(s) for s in song_items]})
+        except: pass
+
+    # Last resort attempt for variety (if less than 4 sections)
+    if len(sections) < 4:
+        try:
+            res = yt.search("Popular Music", limit=20)
+            items = [fmt_song(i) for i in res if i.get("resultType") == "song"]
+            if items:
+                sections.append({"title": "Popular Hits", "items": items[:12]})
+        except: pass
+
+    return jsonify({"sections": sections})
 
 # ─── CHARTS ────────────────────────────────────────────────────────────────────
 
@@ -360,14 +354,19 @@ def mood_playlists():
 def new_releases():
     try:
         data = yt.get_new_releases()
-        # Handle cases where it's a list or dict
         if isinstance(data, list): albums_raw = data
         else: albums_raw = data.get("albums", {}).get("results", []) or data
         
         albums = [fmt_album(a) for a in albums_raw]
+        if not albums:
+            # Fallback to general albums search
+            res = yt.search("New Albums", filter="albums", limit=20)
+            albums = [fmt_album(a) for a in res if a.get("resultType") == "album"]
+            
         return jsonify({"albums": albums})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"New releases error: {e}")
+        return jsonify({"albums": []})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", debug=True, port=5000)
