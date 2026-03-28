@@ -69,19 +69,10 @@ export function Auth({ onLogin }: AuthProps) {
     // Supabase handles the redirection automatically
   };
 
-  // 2. DIRECT APP GOOGLE AUTH TRIGGER
-  const handleNativeTrigger = () => {
-    try {
-      if ((window as any).flutter_inappwebview) {
-        (window as any).flutter_inappwebview.callHandler('FlutterAuth', 'triggerGoogleLogin');
-      } else {
-        alert("App bridge not fully loaded yet. Please wait a moment.");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Error triggering native auth.");
-    }
-  };
+
+  if (isFlutterApp) {
+    return <div className="google-auth-page" style={{ padding: '40px', color: '#fff' }}>App Auth Removed. Redirecting...</div>;
+  }
 
   return (
     <div className="google-auth-page">
@@ -107,33 +98,16 @@ export function Auth({ onLogin }: AuthProps) {
           {loading ? (
             <div className="loader" style={{ margin: '20px 0' }}></div>
           ) : (
-            <>
-              {isFlutterApp ? (
-                /* FLUTTER APP PATH */
-                <div className="direct-google-auth" style={{ width: '100%' }}>
-                  <button 
-                    onClick={handleNativeTrigger} 
-                    className="google-signin-btn"
-                    style={{ background: '#fff', color: '#111', border: '1px solid #ccc', display: 'flex', justifyContent: 'center', padding: '12px', borderRadius: '24px', width: '300px', margin: '0 auto', fontSize: '15px' }}
-                  >
-                    <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" style={{width: '20px', height: '20px', background: '#fff', borderRadius: '50%', padding: '2px', marginRight: '8px'}} />
-                    Continue with Google App
-                  </button>
-                </div>
-              ) : (
-                /* WEB APP PATH */
-                <div className="supabase-google-auth" style={{ width: '100%' }}>
-                  <button 
-                    onClick={handleSupabaseGoogleLogin} 
-                    className="google-signin-btn"
-                    style={{ background: '#111', color: '#fff', border: '1px solid #333', display: 'flex', justifyContent: 'center', padding: '12px', borderRadius: '24px', width: '300px', margin: '0 auto', fontSize: '15px' }}
-                  >
-                    <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" style={{width: '20px', height: '20px', background: '#fff', borderRadius: '50%', padding: '2px', marginRight: '8px'}} />
-                    Sign in with Google
-                  </button>
-                </div>
-              )}
-            </>
+            <div className="supabase-google-auth" style={{ width: '100%' }}>
+              <button 
+                onClick={handleSupabaseGoogleLogin} 
+                className="google-signin-btn"
+                style={{ background: '#111', color: '#fff', border: '1px solid #333', display: 'flex', justifyContent: 'center', padding: '12px', borderRadius: '24px', width: '300px', margin: '0 auto', fontSize: '15px' }}
+              >
+                <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" style={{width: '20px', height: '20px', background: '#fff', borderRadius: '50%', padding: '2px', marginRight: '8px'}} />
+                Sign in with Google
+              </button>
+            </div>
           )}
         </div>
 
@@ -147,7 +121,7 @@ export function Auth({ onLogin }: AuthProps) {
         
         {/* Helper debug text to verify platform logic */}
         <p style={{ fontSize: '10px', color: '#ccc', textAlign: 'center', marginTop: '20px' }}>
-          Running Mode: {isFlutterApp ? 'Flutter Mobile App' : 'Browser Web App'}
+          Running Mode: Browser Web App
         </p>
       </motion.div>
     </div>

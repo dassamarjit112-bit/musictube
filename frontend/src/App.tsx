@@ -221,9 +221,21 @@ function App() {
       fetchHistory(user.id);
       return;
     }
+    const isWebView = /wv/i.test(navigator.userAgent) || /flutter/i.test(navigator.userAgent) || window.location.port === '8080';
+    if (isWebView && !user) {
+      // Auto-skip auth for flutter app entirely
+      setUser({
+        id: 'flutter_guest_id',
+        email: 'app@youtube.music',
+        full_name: 'My Music',
+        avatar_url: ''
+      });
+      return;
+    }
+
     // Fallback: check Supabase session (e.g. after OAuth redirect or page refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
+      if (session?.user && !isWebView) {
         const u = {
           id: session.user.id,
           email: session.user.email,
@@ -698,7 +710,7 @@ function App() {
                 {!user?.avatar_url && (user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}
               </div>
             ) : (
-              <button className="sign-in-btn-sm" onClick={() => setView({ name: 'account' })}>Sign In</button>
+              <button className="sign-in-btn-sm" style={{ display: /wv|flutter/i.test(navigator.userAgent) || window.location.port === '8080' ? 'none' : 'block' }} onClick={() => setView({ name: 'account' })}>Sign In</button>
             )}
           </div>
         </header>
