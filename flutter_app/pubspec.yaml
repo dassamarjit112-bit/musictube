@@ -29,7 +29,7 @@ flutter:
   assets:
     - assets/www/
     # If Vite has a subfolder for assets, add it too:
-    - assets/www/
+    - assets/www/assets/
     
 
   
