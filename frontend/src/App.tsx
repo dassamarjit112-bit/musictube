@@ -36,11 +36,6 @@ function App() {
       return null;
     }
   });
-  // src/App.jsx
-const [user, setUser] = useState(null);
-
-// If user is null, show Auth. If user is NOT null, show Home.
-return user ? <HomePage /> : <Auth onLogin={(u) => setUser(u)} />;
   
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
