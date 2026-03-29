@@ -781,7 +781,7 @@ function App() {
           </button>
         </div>
         <nav>
-          <button onClick={() => navigateTo({ name: "home" })} className={view.name === "home" ? "active" : ""}>
+          <button onClick={() => navigateTo({ name: "home" })} className={`mobile-only ${view.name === "home" ? "active" : ""}`}>
             <Home size={24} /> <span>Home</span>
           </button>
           <button onClick={() => navigateTo({ name: "explore" })} className={view.name === "explore" ? "active" : ""}>
@@ -789,7 +789,7 @@ function App() {
           </button>
           <button 
             onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })} 
-            className={view.name === "library" ? "active" : ""}
+            className={`mobile-only ${view.name === "library" ? "active" : ""}`}
           >
             <Library size={24} /> <span>Library</span>
           </button>
