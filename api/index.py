@@ -192,5 +192,18 @@ def new_releases():
         return jsonify({"albums": items})
     except: return jsonify({"albums": []})
 
+@app.route("/api/watch/<video_id>")
+def watch(video_id):
+    try:
+        # Fetch similar tracks (Radio)
+        data = yt.get_watch_playlist(video_id, limit=50)
+        tracks = []
+        for t in data.get("tracks", []):
+            tracks.append(fmt_song(t))
+        return jsonify({"tracks": tracks})
+    except Exception as e:
+        print(f"Watch fetch error: {e}")
+        return jsonify({"tracks": []})
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

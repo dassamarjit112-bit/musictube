@@ -88,6 +88,7 @@ function App() {
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
   const [autoPlay, setAutoPlay] = useState(true);
+  const [showFloatingControls, setShowFloatingControls] = useState(false);
 
   useEffect(() => {
     const hOnline = () => setIsOffline(false);
@@ -99,7 +100,6 @@ function App() {
       window.removeEventListener('offline', hOffline);
     };
   }, []);
-  // Persistence Layer
   useEffect(() => {
     const savedFavs = localStorage.getItem("ytm_favorites");
     const savedDLs = localStorage.getItem("ytm_downloads");
@@ -576,20 +576,11 @@ function App() {
       }
     }
     
-    // Proactive AI Radio Extension
-    if (autoPlay && nextIdx >= q.length - 3) {
-      const lastSong = q[nextIdx] || currentSongRef.current;
+    // Proactive AI Radio Extension: Generate more songs BEFORE the queue ends
+    if (autoPlay && nextIdx >= q.length - 5) {
+      const lastSong = q[q.length - 1] || currentSongRef.current;
       if (lastSong) {
-        try {
-          const res = await api.watch(lastSong.videoId);
-          if (res.tracks && res.tracks.length > 0) {
-            const nextBatch = res.tracks.slice(1, 40);
-            setQueue(prevQueue => {
-              const uBatch = nextBatch.filter(s => !prevQueue.find(sq => sq.videoId === s.videoId));
-              return [...prevQueue, ...uBatch];
-            });
-          }
-        } catch (e) { console.error(e); }
+        triggerAutoPlayExtension(lastSong);
       }
     }
 
@@ -648,25 +639,23 @@ function App() {
     }
     silentRef.current.play().catch(() => {});
     
-    // NEW: MusicTube 'Radio' Logic (30+ tracks)
-    // If a list was provided (e.g. from an album), use it.
-    // Otherwise, generate an AI Radio based on the song clicked.
-    if (songList && songList.length > 5) {
+    // AI Radio / Up Next Generator
+    if (songList && songList.length > 10) {
       setQueue(songList);
     } else {
       console.log("🔮 Infinite Radio Initializing for:", song.title);
       try {
         const res = await api.watch(song.videoId);
-        if (res.tracks && res.tracks.length > 0) {
-          // Flattening and diversifying the list
-          const radioMix = [song, ...res.tracks.slice(1, 40)]; // Up to 40 tracks of same vibe
+        if (res.tracks && res.tracks.length > 5) {
+          // Flattening and diversifying the list (YouTube Music Style: 30+ Tracks)
+          const radioMix = [song, ...res.tracks.slice(1, 45)]; 
           setQueue(radioMix);
         } else {
-          setQueue(q => q.find(s => s.videoId === song.videoId) ? q : [...q, song]);
+          setQueue(prev => prev.some(s => s.videoId === song.videoId) ? prev : [...prev, song]);
         }
       } catch (e) {
         console.error("Radio Generation Failed:", e);
-        setQueue(q => q.find(s => s.videoId === song.videoId) ? q : [...q, song]);
+        setQueue(prev => prev.some(s => s.videoId === song.videoId) ? prev : [...prev, song]);
       }
     }
   };
@@ -722,6 +711,43 @@ function App() {
     setUser(null);
     setView({ name: "home" });
   };
+
+  // ─── Web Media Session (Background Controls) ───
+  useEffect(() => {
+    if ("mediaSession" in navigator && currentSong) {
+      navigator.mediaSession.metadata = new window.MediaMetadata({
+        title: currentSong.title,
+        artist: currentSong.artist || "MusicTube",
+        album: currentSong.album || "Trending",
+        artwork: [
+          { src: currentSong.thumbnail, sizes: '96x96',   type: 'image/png' },
+          { src: currentSong.thumbnail, sizes: '128x128', type: 'image/png' },
+          { src: currentSong.thumbnail, sizes: '192x192', type: 'image/png' },
+          { src: currentSong.thumbnail, sizes: '256x256', type: 'image/png' },
+          { src: currentSong.thumbnail, sizes: '384x384', type: 'image/png' },
+          { src: currentSong.thumbnail, sizes: '512x512', type: 'image/png' },
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
+      navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+      navigator.mediaSession.setActionHandler('previoustrack', handlePrev);
+      navigator.mediaSession.setActionHandler('nexttrack', handleNext);
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined && duration > 0) {
+          const newPos = details.seekTime / duration;
+          setPlayed(newPos);
+          ytPlayer.seekTo(newPos);
+        }
+      });
+    }
+  }, [currentSong, duration]);
+
+  useEffect(() => {
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+    }
+  }, [isPlaying]);
 
   // ─── Main App ────────────────────────────────────────────────────────────────
   if (!user && !isWebView) {
@@ -1351,7 +1377,26 @@ function App() {
                          <button className="back-btn-v3" onClick={() => setView({ name: 'home' })}>
                            <ArrowLeft size={24} />
                          </button>
-                         <img src={currentSong.thumbnail} className="player-art-v3" alt="" />
+                          <div className="player-art-container" onClick={() => setShowFloatingControls(!showFloatingControls)}>
+                            <img src={currentSong.thumbnail} className="player-art-v3" alt="" />
+                            <AnimatePresence>
+                              {showFloatingControls && (
+                                <motion.div 
+                                  className="floating-player-controls"
+                                  initial={{ opacity: 0, scale: 0.9 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.9 }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button onClick={handlePrev} className="float-btn"><SkipBack size={32} fill="currentColor" /></button>
+                                  <button className="float-play-circle" onClick={() => setIsPlaying(!isPlaying)}>
+                                    {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" style={{ marginLeft: 6 }} />}
+                                  </button>
+                                  <button onClick={handleNext} className="float-btn"><SkipForward size={32} fill="currentColor" /></button>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                          <div className="player-info-v3">
                             <h2>{currentSong.title}</h2>
                             <p>{currentSong.artist} • {currentSong.album}</p>
