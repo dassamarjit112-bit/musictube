@@ -1898,10 +1898,10 @@ body {
     display: none !important;
   }
 
-  /* Mobile Bottom Navigation */
-  .mobile-bottom-nav {
-    display: none; /* Hide on desktop */
-  }
+/* Mobile Bottom Navigation */
+.mobile-bottom-nav {
+  display: none !important; /* Hide on desktop */
+}
 
   @media (max-width: 768px) {
     .mobile-bottom-nav {
@@ -1910,7 +1910,7 @@ body {
       left: 50%;
       transform: translateX(-50%);
       width: auto;
-      min-width: 60%; /* Smaller for 2 tabs */
+      min-width: 60%; 
       max-width: 80%;
       height: 64px;
       background: rgba(18, 18, 18, 0.9);
