@@ -23,7 +23,8 @@ type View =
   | { name: "artist"; id: string }
   | { name: "album"; id: string }
   | { name: "playlist"; id: string }
-  | { name: "plans" };
+  | { name: "plans" }
+  | { name: "player" };
 
 function App() {
   const [view, setView] = useState<View>({ name: "home" });
@@ -78,6 +79,8 @@ function App() {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   const isPremium = user?.subscription_tier === 'premium';
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
 
   useEffect(() => {
     const hOnline = () => setIsOffline(false);
@@ -102,11 +105,17 @@ function App() {
     if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
     if (savedSong) setCurrentSong(JSON.parse(savedSong));
     
-    // Auto-redirect to Plans if no subscription
-    if (user && !user.subscription_tier) {
-      setView({ name: 'plans' });
-    } else if (savedView) {
-      setView(JSON.parse(savedView));
+    // Auto-redirect to Plans if no subscription (Crucial for blocking content)
+    const storedUser = localStorage.getItem("ytm_user");
+    if (storedUser) {
+      const u = JSON.parse(storedUser);
+      if (!u.subscription_tier) {
+        setView({ name: 'plans' });
+      } else if (savedView) {
+        setView(JSON.parse(savedView));
+      }
+    } else {
+      setView({ name: 'home' });
     }
   }, [user]);
 
@@ -471,47 +480,77 @@ function App() {
   };
 
   const handleNext = async () => {
-    const idx = queueRef.current.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
+    const q = queueRef.current;
+    if (q.length === 0) return;
     
-    // Proactive Infinite Radio: Fetch 40 tracks when nearing end of current batch
-    if (idx >= queueRef.current.length - 3) {
-      const lastSong = currentSongRef.current;
+    // Repeat One logic
+    if (repeatMode === 'one' && currentSongRef.current) {
+      ytPlayer.seekTo(0);
+      setIsPlaying(true);
+      return;
+    }
+
+    const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
+    let nextIdx = currentIdx + 1;
+
+    // Advanced Navigation: Shuffle & Repeat All
+    if (isShuffle) {
+      nextIdx = Math.floor(Math.random() * q.length);
+      if (nextIdx === currentIdx && q.length > 1) nextIdx = (nextIdx + 1) % q.length;
+    } else if (nextIdx >= q.length) {
+      if (repeatMode === 'all') {
+        nextIdx = 0;
+      } else {
+        setIsPlaying(false);
+        return;
+      }
+    }
+    
+    // Proactive AI Radio Extension
+    if (nextIdx >= q.length - 3) {
+      const lastSong = q[nextIdx] || currentSongRef.current;
       if (lastSong) {
-        console.log("🌌 Deepening AI Radio Vibe...");
         try {
           const res = await api.watch(lastSong.videoId);
           if (res.tracks && res.tracks.length > 0) {
             const nextBatch = res.tracks.slice(1, 40);
-            setQueue(q => {
-              const uniqueBatch = nextBatch.filter(s => !q.find(sq => sq.videoId === s.videoId));
-              return [...q, ...uniqueBatch];
+            setQueue(prevQueue => {
+              const uBatch = nextBatch.filter(s => !prevQueue.find(sq => sq.videoId === s.videoId));
+              return [...prevQueue, ...uBatch];
             });
           }
         } catch (e) { console.error(e); }
       }
     }
 
-    if (idx < queueRef.current.length - 1) {
-      setCurrentSong(queueRef.current[idx + 1]);
-    } else {
-      setIsPlaying(false);
-    }
+    setCurrentSong(q[nextIdx]);
   };
 
   const handlePrev = () => {
     if (playedSeconds > 3) {
-      // Restart current song
       ytPlayer.seekTo(0);
       return;
     }
-    const song = currentSongRef.current;
-    if (!song || queue.length === 0) return;
-    const idx = queue.findIndex((s) => s.videoId === song.videoId);
-    if (idx > 0) setCurrentSong(queue[idx - 1]);
+    const q = queueRef.current;
+    const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
+    if (currentIdx > 0) {
+      setCurrentSong(q[currentIdx - 1]);
+    } else if (repeatMode === 'all' && q.length > 0) {
+      setCurrentSong(q[q.length - 1]);
+    }
   };
 
   const playSong = async (song: Song, songList?: Song[]) => {
     if (!song.videoId) return;
+
+    // Strict Blocking: Only subscribers can play music
+    const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
+    if (!isSubscribed) {
+      setView({ name: 'plans' });
+      setShowSubscriptionModal(true);
+      return;
+    }
+
     console.log("▶ Playing:", song.title, "| videoId:", song.videoId);
     
     // Set immediate song to start playback
@@ -582,8 +621,21 @@ function App() {
   const goBack = () => setView({ name: "home" });
 
   const navigateTo = (v: View) => {
+    // Strict Blocking: If no subscription, only permit Account or Plans views
+    const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
+    if (!isSubscribed && v.name !== 'account' && v.name !== 'plans') {
+      setView({ name: 'plans' });
+      return;
+    }
     setView(v);
-    setIsSidebarOpen(false); // Close sidebar on mobile after selection
+    setIsSidebarOpen(false);
+  };
+
+  const handleShuffleToggle = () => setIsShuffle(!isShuffle);
+  const handleRepeatToggle = () => {
+    if (repeatMode === 'none') setRepeatMode('all');
+    else if (repeatMode === 'all') setRepeatMode('one');
+    else setRepeatMode('none');
   };
 
   // ─── Login Screen ────────────────────────────────────────────────────────────
@@ -1210,6 +1262,71 @@ function App() {
                 </div>
               )}
 
+              {/* ── PLAYER VIEW (DESKTOP & MOBILE) ── */}
+              {view.name === "player" && currentSong && (
+                <div className="player-full-view">
+                   <div className="player-bg-blur" style={{ backgroundImage: `url(${currentSong.thumbnail})` }} />
+                   <div className="player-content-grid">
+                      <div className="player-left">
+                         <button className="back-btn-v3" onClick={() => setView({ name: 'home' })}>
+                           <ArrowLeft size={24} />
+                         </button>
+                         <img src={currentSong.thumbnail} className="player-art-v3" alt="" />
+                         <div className="player-info-v3">
+                            <h2>{currentSong.title}</h2>
+                            <p>{currentSong.artist} • {currentSong.album}</p>
+                            <div className="player-actions-v3">
+                               <button className="act-btn"><ThumbsUp size={24} /></button>
+                               <button className="act-btn" onClick={() => setActiveMenuSong(currentSong)}><PlusCircle size={24} /></button>
+                               <button className="act-btn"><Search size={24} /></button>
+                            </div>
+                         </div>
+                      </div>
+                      <div className="player-right">
+                         <div className="queue-header-v3">
+                            <h3>Up Next</h3>
+                            <div className="queue-modes">
+                               <button className={isShuffle ? 'active' : ''} onClick={handleShuffleToggle}><Shuffle size={18} /></button>
+                               <button className={repeatMode !== 'none' ? 'active' : ''} onClick={handleRepeatToggle}><Repeat size={18} /> {repeatMode === 'one' && '1'}</button>
+                            </div>
+                         </div>
+                         <div className="player-queue-list">
+                            {queue.map((s, i) => (
+                               <div 
+                                 key={i} 
+                                 className={`q-row-v3 ${s.videoId === currentSong.videoId ? 'active' : ''}`}
+                                 onClick={() => setCurrentSong(s)}
+                               >
+                                  <img src={s.thumbnail} alt="" />
+                                  <div className="q-info">
+                                     <p className="q-title">{s.title}</p>
+                                     <p className="q-artist">{s.artist}</p>
+                                  </div>
+                                  {s.videoId === currentSong.videoId && <div className="q-playing-icon"><Music2 size={16} /></div>}
+                               </div>
+                            ))}
+                         </div>
+                      </div>
+                   </div>
+
+                   {/* Fixed Bottom Controls for Player View */}
+                   <div className="player-controls-v3">
+                      <div className="prog-container">
+                        <span className="time">{formatTime(playedSeconds)}</span>
+                        <input type="range" min={0} max={0.9999} step="any" value={played} onChange={handleSeek} />
+                        <span className="time">{formatTime(duration)}</span>
+                      </div>
+                      <div className="ctrl-btns-v3">
+                         <button onClick={handlePrev}><SkipBack size={32} fill="currentColor" /></button>
+                         <button className="play-circle" onClick={() => setIsPlaying(!isPlaying)}>
+                            {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" style={{ marginLeft: 6 }} />}
+                         </button>
+                         <button onClick={handleNext}><SkipForward size={32} fill="currentColor" /></button>
+                      </div>
+                   </div>
+                </div>
+              )}
+      
               {/* ── PLANS SELECTION ── */}
               {view.name === "plans" && (
                 <div className="plans-selection-view">
@@ -1245,7 +1362,6 @@ function App() {
                    </div>
                 </div>
               )}
-      
       {/* ── PLAYER ── */}
           {view.name === "artist" && (
             <motion.div 
@@ -1388,8 +1504,9 @@ function App() {
         onRefreshUser={(u) => setUser(u)}
       />
 
-      {/* ── Player Bar ── */}
-      <footer className="player-bar-v2" onClick={() => window.innerWidth < 768 && setShowMobilePlayer(true)}>
+      {/* Player Bar - Only visible to subscribers */}
+      {(user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium') && (
+        <footer className="player-bar-v2" onClick={() => navigateTo({ name: 'player' })}>
         <div className="mini-player-bg" style={{ backgroundImage: currentSong ? `url(${currentSong.thumbnail})` : 'none' }} />
         <div className="progress-bar-container">
           <input
@@ -1455,11 +1572,25 @@ function App() {
               className="volume-range"
               onClick={(e) => e.stopPropagation()}
             />
-            <Shuffle size={18} />
-            <Repeat size={18} />
+            <button
+              className={`icon-btn ${isShuffle ? 'active' : ''}`}
+              onClick={(e) => { e.stopPropagation(); handleShuffleToggle(); }}
+              title="Shuffle"
+            >
+              <Shuffle size={18} />
+            </button>
+            <button
+              className={`icon-btn ${repeatMode !== 'none' ? 'active' : ''}`}
+              onClick={(e) => { e.stopPropagation(); handleRepeatToggle(); }}
+              title={`Repeat ${repeatMode}`}
+            >
+              <Repeat size={18} />
+              {repeatMode === 'one' && <span className="repeat-one-indicator">1</span>}
+            </button>
           </div>
         </div>
       </footer>
+      )}
 
       {/* ── Hidden YouTube IFrame Container ── */}
       <div className="yt-engine">

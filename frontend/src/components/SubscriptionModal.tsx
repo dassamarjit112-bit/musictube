@@ -62,16 +62,27 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
   const updateSubscriptionInSupabase = async (isPremium: boolean) => {
     if (!user?.id) return;
     const tier = isPremium ? 'premium' : 'basic';
+    
+    // Using UPSERT to ensure the profile row exists even if first time payment
     const { error } = await supabase
       .from('profiles')
-      .update({ subscription_tier: tier })
-      .eq('id', user.id);
+      .upsert({ 
+        id: user.id, 
+        subscription_tier: tier,
+        email: user.email,
+        full_name: user.full_name,
+        avatar_url: user.avatar_url,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
     
     if (!error) {
       const updated = { ...user, subscription_tier: tier };
       localStorage.setItem('ytm_user', JSON.stringify(updated));
       onRefreshUser(updated);
-      alert(`Success! You are now a ${tier} member.`);
+      alert(`🎉 Success! You are now a ${tier.toUpperCase()} member.`);
+    } else {
+      console.error("Supabase update error:", error);
+      alert("Payment success, but profile sync failed. Please refresh the page.");
     }
   };
 
