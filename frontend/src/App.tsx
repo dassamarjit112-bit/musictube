@@ -28,6 +28,8 @@ type View =
 
 const FALLBACK_THUMB = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=500&fit=crop";
 
+const GUEST_USER = { id: 'guest', email: '', full_name: 'Guest', avatar_url: '', subscription_tier: 'free', isGuest: true };
+
 function App() {
   const [view, setView] = useState<View>(() => {
     try {
@@ -48,9 +50,9 @@ function App() {
   const [user, setUser] = useState<any>(() => {
     try {
       const saved = localStorage.getItem('ytm_user');
-      return saved ? JSON.parse(saved) : null;
+      return saved ? JSON.parse(saved) : GUEST_USER;
     } catch {
-      return null;
+      return GUEST_USER;
     }
   });
   
@@ -114,14 +116,25 @@ function App() {
       const storedUser = localStorage.getItem("ytm_user");
       if (storedUser) {
         const u = JSON.parse(storedUser);
-        if (!u.subscription_tier) {
-          setView({ name: 'plans' });
-        } else if (savedView) {
+        if (savedView) {
           try {
-            setView(JSON.parse(savedView));
+            const parsed = JSON.parse(savedView);
+            // Don't restore plan/account views on refresh
+            if (parsed.name !== 'plans' && parsed.name !== 'account') {
+              setView(parsed);
+            } else {
+              setView({ name: 'home' });
+            }
           } catch {
             setView({ name: 'home' });
           }
+        } else {
+          setView({ name: 'home' });
+        }
+        // Only force plans page if user has never chosen a tier AND we explicitly need it
+        if (!u.subscription_tier) {
+          // Don't block, just show home - plans are optional
+          setView({ name: 'home' });
         }
       } else {
         setView({ name: 'home' });
@@ -773,9 +786,7 @@ function App() {
   }, [isPlaying]);
 
   // --- Main App ---
-  if (!user) {
-    return <Auth onLogin={setUser} />;
-  }
+  // App always renders; Auth is shown as a view (account page)
 
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
