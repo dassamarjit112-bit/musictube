@@ -15,6 +15,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
   const [loading, setLoading] = useState(false);
   const [giftCode, setGiftCode] = useState(initialGiftCode || '');
   const [giftError, setGiftError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   React.useEffect(() => {
     if (initialGiftCode) setGiftCode(initialGiftCode);
@@ -47,7 +48,6 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
         // In a real app, verify signature on backend
         console.log("Payment Success:", response);
         await updateSubscriptionInSupabase(plan === 'Premium');
-        onClose();
       },
       prefill: {
         name: user?.full_name || "",
@@ -64,6 +64,19 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
     setLoading(false);
   };
 
+  const handleSuccessfulUpgrade = (tier: string, isLocal: boolean = false) => {
+    const updated = { ...user, id: user?.id || 'flutter_guest_id', subscription_tier: tier };
+    localStorage.setItem('ytm_user', JSON.stringify(updated));
+    setSuccessMessage(`🎉 ${tier === 'premium' ? 'Premium Pro' : 'Basic'} activated! ${isLocal ? '(Locally Synced)' : ''}`);
+    
+    // Automatically close the modal and refresh the app state after a brief delay
+    setTimeout(() => {
+      onRefreshUser(updated);
+      onClose(); // Explicitly trigger the close logic if onRefreshUser doesn't
+      setSuccessMessage('');
+    }, 2500);
+  };
+
   const updateSubscriptionInSupabase = async (isPremium: boolean) => {
     const tier = isPremium ? 'premium' : 'basic';
     const effectiveUserId = user?.id || 'flutter_guest_id';
@@ -72,10 +85,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
     // For Guests, we only update LocalStorage and refresh the UI
     if (isGuest) {
       console.log("Syncing Guest Offline Tier...");
-      const updated = { ...user, id: effectiveUserId, subscription_tier: tier };
-      localStorage.setItem('ytm_user', JSON.stringify(updated));
-      onRefreshUser(updated);
-      alert(`🎉 Success! You are now a ${tier === 'premium' ? 'Premium Pro' : 'Basic'} member on this device.`);
+      handleSuccessfulUpgrade(tier, true);
       return;
     }
 
@@ -93,20 +103,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
         }, { onConflict: 'id' });
       
       if (!error) {
-        const updated = { ...user, subscription_tier: tier };
-        localStorage.setItem('ytm_user', JSON.stringify(updated));
-        onRefreshUser(updated);
-        alert(`🎉 Success! You are now a ${tier === 'premium' ? 'Premium Pro' : 'Basic'} member!`);
+        handleSuccessfulUpgrade(tier, false);
       } else {
         throw error;
       }
     } catch (e: any) {
        console.error("Supabase sync failed (likely RLS or ID format):", e);
-       // Local Fallback
-       const updated = { ...user, subscription_tier: tier };
-       localStorage.setItem('ytm_user', JSON.stringify(updated));
-       onRefreshUser(updated);
-       alert(`🎉 ${tier === 'premium' ? 'Premium Pro' : 'Basic'} activated! (Synced locally)`);
+       handleSuccessfulUpgrade(tier, true); // Fallback to local
     }
   };
 
@@ -157,11 +160,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
         return;
       }
 
-      // Step 3: Update user subscription
+      // Step 3: Update user subscription (it handles showing the success message)
       const isPremium = data.tier === 'premium';
       await updateSubscriptionInSupabase(isPremium);
       setGiftCode('');
-      onClose();
 
     } catch (e: any) {
       console.error('Gift code error:', e);
@@ -190,9 +192,27 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
         </div>
 
         <div className="modal-body">
-          <div className="modal-grid">
-            {/* Basic Plan */}
-            <div className="modal-plan-card">
+          {successMessage ? (
+            <div className="modal-success-state" style={{ padding: '60px 20px', textAlign: 'center' }}>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring" }}
+              >
+                <div style={{ width: 80, height: 80, background: '#4caf50', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                  <Check size={48} color="#fff" />
+                </div>
+              </motion.div>
+              <h2 style={{ fontSize: 24, marginBottom: 12 }}>Welcome aboard!</h2>
+              <p style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                {successMessage}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="modal-grid">
+                {/* Basic Plan */}
+                <div className="modal-plan-card">
               <div className="plan-type">
                 <Zap size={16} /> Lifetime Basic
               </div>
@@ -258,8 +278,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
                 {loading ? '...' : 'Redeem'}
               </button>
             </div>
-            {giftError && <p style={{ color: '#ff4444', fontSize: '12px', marginTop: '8px' }}>{giftError}</p>}
-          </div>
+                {giftError && <p style={{ color: '#ff4444', fontSize: '13px', marginTop: '12px' }}>{giftError}</p>}
+              </div>
+            </>
+          )}
         </div>
       </motion.div>
     </div>
