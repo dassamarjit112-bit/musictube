@@ -140,17 +140,17 @@ export function useYouTubePlayer(
   }, [stopProgress]);
 
   const load = useCallback(
-    (videoId: string) => {
-      if (!videoId) return;
-      if (window.YT && window.YT.Player) {
-        initPlayer(videoId);
-      } else {
-        apiReadyCallbacks.push(() => initPlayer(videoId));
-      }
-    },
-    [initPlayer]
-  );
-
+ const cue = useCallback(
+  (videoId: string) => {
+    if (!videoId || !isReadyRef.current) return;
+    try {
+      playerRef.current?.cueVideoById(videoId);
+    } catch (e) {
+      console.error("Cue failed", e);
+    }
+  },
+  []
+);
   const play = useCallback(() => {
     if (!isReadyRef.current) return;
     try { playerRef.current?.playVideo(); } catch {}
@@ -179,6 +179,6 @@ export function useYouTubePlayer(
 
   // Stable API object
   return useMemo(() => ({
-    load, play, pause, seekTo, setVolume
-  }), [load, play, pause, seekTo, setVolume]);
+    load, cue, play, pause, seekTo, setVolume, player: playerRef.current
+  }), [load, cue, play, pause, seekTo, setVolume]);
 }
