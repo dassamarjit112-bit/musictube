@@ -40,18 +40,9 @@ function App() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const isWebView = /wv/i.test(navigator.userAgent) || /flutter/i.test(navigator.userAgent) || window.location.port === '8080';
 
   const [user, setUser] = useState<any>(() => {
     try {
-      if (isWebView) {
-        return {
-          id: 'flutter_guest_id',
-          email: 'app@youtube.music',
-          full_name: 'My Music',
-          avatar_url: ''
-        };
-      }
       const saved = localStorage.getItem('ytm_user');
       return saved ? JSON.parse(saved) : null;
     } catch {
@@ -114,7 +105,7 @@ function App() {
     if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
     if (savedSong) setCurrentSong(JSON.parse(savedSong));
     
-    // Auto-redirect to Plans if no subscription (Crucial for blocking content)
+    // Load user and subscription state
     const storedUser = localStorage.getItem("ytm_user");
     if (storedUser) {
       const u = JSON.parse(storedUser);
@@ -138,16 +129,32 @@ function App() {
   }, [favorites, downloads, playlists, currentSong, queue, view]);
 
   const silentRef = useRef<HTMLAudioElement | null>(null);
+  const wakeLockRef = useRef<any>(null);
 
-  // Android Background Play Persistence
+  // ─── Wake Lock & Background Persistence ───
   useEffect(() => {
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator && isPlaying) {
+          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.error("Wake Lock failed:", err);
+      }
+    };
+
     if (isPlaying) {
+      requestWakeLock();
       silentRef.current?.play().catch(() => {});
     } else {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().then(() => {
+          wakeLockRef.current = null;
+        });
+      }
       silentRef.current?.pause();
     }
   }, [isPlaying]);
-
 
   const currentSongRef = useRef(currentSong);
   currentSongRef.current = currentSong;
@@ -731,17 +738,26 @@ function App() {
         ]
       });
 
-      navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
-      navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+      const playHandler = () => setIsPlaying(true);
+      const pauseHandler = () => setIsPlaying(false);
+
+      navigator.mediaSession.setActionHandler('play', playHandler);
+      navigator.mediaSession.setActionHandler('pause', pauseHandler);
       navigator.mediaSession.setActionHandler('previoustrack', handlePrev);
       navigator.mediaSession.setActionHandler('nexttrack', handleNext);
-      navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (details.seekTime !== undefined && duration > 0) {
-          const newPos = details.seekTime / duration;
-          setPlayed(newPos);
-          ytPlayer.seekTo(newPos);
-        }
-      });
+      
+      try {
+        navigator.mediaSession.setActionHandler('stop', pauseHandler);
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (details.seekTime !== undefined && duration > 0) {
+            const newPos = details.seekTime / duration;
+            setPlayed(newPos);
+            ytPlayer.seekTo(newPos);
+          }
+        });
+      } catch (e) {
+        // Fallback for older browsers
+      }
     }
   }, [currentSong, duration]);
 
