@@ -1843,6 +1843,7 @@ function App() {
             downloads={downloads}
             toggleDownload={toggleDownload}
             onShowMenu={setActiveMenuSong}
+            goBack={() => setView({ name: 'home' })}
           />
         )}
       </AnimatePresence>
@@ -1879,7 +1880,8 @@ const FullScreenPlayer = ({
   onToggleFavorite,
   downloads,
   toggleDownload,
-  onShowMenu
+  onShowMenu,
+  goBack
 }: any) => {
   return (
     <motion.div 
