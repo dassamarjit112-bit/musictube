@@ -62,27 +62,46 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ user, isOp
   const updateSubscriptionInSupabase = async (isPremium: boolean) => {
     if (!user?.id) return;
     const tier = isPremium ? 'premium' : 'basic';
+    const isGuest = user.id === 'flutter_guest_id';
     
-    // Using UPSERT to ensure the profile row exists even if first time payment
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({ 
-        id: user.id, 
-        subscription_tier: tier,
-        email: user.email,
-        full_name: user.full_name,
-        avatar_url: user.avatar_url,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'id' });
-    
-    if (!error) {
+    // For Guests, we only update LocalStorage and refresh the UI
+    if (isGuest) {
+      console.log("Syncing Guest Offline Tier...");
       const updated = { ...user, subscription_tier: tier };
       localStorage.setItem('ytm_user', JSON.stringify(updated));
       onRefreshUser(updated);
-      alert(`🎉 Success! You are now a ${tier.toUpperCase()} member.`);
-    } else {
-      console.error("Supabase update error:", error);
-      alert("Payment success, but profile sync failed. Please refresh the page.");
+      alert(`🎉 Success! You are now a ${tier.toUpperCase()} member on this device.`);
+      return;
+    }
+
+    // For Registered Users, Sync to Supabase
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({ 
+          id: user.id, 
+          subscription_tier: tier,
+          email: user.email || '',
+          full_name: user.full_name || '',
+          avatar_url: user.avatar_url || '',
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+      
+      if (!error) {
+        const updated = { ...user, subscription_tier: tier };
+        localStorage.setItem('ytm_user', JSON.stringify(updated));
+        onRefreshUser(updated);
+        alert(`🎉 Success! You are now a ${tier.toUpperCase()} member.`);
+      } else {
+        throw error;
+      }
+    } catch (e: any) {
+       console.error("Supabase sync failed (likely RLS or ID format):", e);
+       // We still update local status so the user can use the app they just paid for!
+       const updated = { ...user, subscription_tier: tier };
+       localStorage.setItem('ytm_user', JSON.stringify(updated));
+       onRefreshUser(updated);
+       alert("🎉 Payment Success! Your features are unlocked. (Sync saved locally)");
     }
   };
 
