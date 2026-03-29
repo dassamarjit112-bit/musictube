@@ -13,12 +13,12 @@ export function Auth({ onLogin }: AuthProps) {
 
   useEffect(() => {
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-    const isWebView = 
-      /wv/i.test(userAgent) || 
-      /flutter/i.test(userAgent) || 
+    const isWebView =
+      /wv/i.test(userAgent) ||
+      /flutter/i.test(userAgent) ||
       (window as any).flutter_inappwebview !== undefined ||
       window.location.port === '8080';
-    
+
     setIsFlutterApp(isWebView);
 
     (window as any).onNativeLoginSuccess = async (nativeUserData: any) => {
@@ -56,7 +56,7 @@ export function Auth({ onLogin }: AuthProps) {
         redirectTo: window.location.origin
       }
     });
-    
+
     if (error) {
       alert(error.message);
       setLoading(false);
@@ -85,8 +85,8 @@ export function Auth({ onLogin }: AuthProps) {
         </div>
 
         <div className="auth-content-v2">
-          <button 
-            onClick={handleSupabaseGoogleLogin} 
+          <button
+            onClick={handleSupabaseGoogleLogin}
             disabled={loading}
             className="google-btn-premium"
           >
@@ -94,12 +94,12 @@ export function Auth({ onLogin }: AuthProps) {
               <div className="mini-loader" />
             ) : (
               <>
-                <img src="https://lh3.googleusercontent.com/COxitqgJr1sICpeqCu7IFH7I64k3-7B14mRLeuS60B8_8D-0v6S6_08I3vj7U8-p-n0=w300" alt="Google" className="google-icon-v2" />
+                <img src="google.png" className="google-icon-v2" />
                 Sign in with Google
               </>
             )}
           </button>
-          
+
           <div className="auth-benefits-v2">
             <div className="benefit-item-v2">
               <Headphones size={20} className="benefit-icon-v2" />
@@ -119,7 +119,7 @@ export function Auth({ onLogin }: AuthProps) {
         <div className="auth-footer-v2">
           <p>By signing in, you agree to our Terms and Conditions.</p>
           <div className="secure-badge-v2">
-             <ShieldCheck size={12} /> Secure Account
+            <ShieldCheck size={12} /> Secure Account
           </div>
         </div>
       </motion.div>
