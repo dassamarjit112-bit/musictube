@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { X, Check, Zap, Star, Gift, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 

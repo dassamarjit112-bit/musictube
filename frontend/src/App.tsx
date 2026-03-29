@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
   Volume2, ThumbsUp, MoreVertical, Search,
-  Home, Compass, Library, PlusCircle, ArrowLeft, Music2, Menu
+  Home, Compass, Library, PlusCircle, ArrowLeft, Music2, Menu, Star
 } from "lucide-react";
 import { api } from "./api";
 import type { Song, HomeSection, SearchResult, ArtistDetail, AlbumDetail } from "./api";
@@ -758,6 +758,7 @@ function App() {
                       </button>
                     ))}
                   </div>
+                  <ControlledAd isPremium={isPremium} adSlot="home_top" />
                   {homeData.length === 0 && (
                     <div className="loading-grid">
                       {[1,2,3,4].map(i => <div key={i} className="skeleton-card" />)}
@@ -828,6 +829,7 @@ function App() {
                       <button className="chip">Moods</button>
                     </div>
                   </div>
+                  <ControlledAd isPremium={isPremium} adSlot="explore_top" />
                   {isLoadingExplore ? (
                     <div className="loading-grid">
                       {[1,2,3].map(i => <div key={i} className="skeleton-card" />)}
