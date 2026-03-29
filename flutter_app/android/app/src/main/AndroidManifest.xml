@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
-        android:label="YT Music"
+        android:label="MusicTube"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"> <!-- FIX 2: Allows HTTP traffic if the backend API doesn't use HTTPS -->

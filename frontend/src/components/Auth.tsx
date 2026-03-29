@@ -85,13 +85,11 @@ export function Auth({ onLogin }: AuthProps) {
       >
         <div className="google-header" style={{ marginBottom: '40px' }}>
           <div className="google-brand">
-            <svg viewBox="0 0 24 24" width="40" height="40">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" fill="#f00" />
-            </svg>
-            <span style={{ color: '#fff', fontSize: '28px', fontWeight: '800', letterSpacing: '-1px' }}>Music</span>
+            <img src="/logo.png" alt="MusicTube" style={{ width: '48px', height: '48px', marginRight: '12px' }} />
+            <span style={{ color: '#fff', fontSize: '28px', fontWeight: '800', letterSpacing: '-1px' }}>MusicTube</span>
           </div>
           <h1 style={{ marginTop: '20px' }}>Sign in</h1>
-          <p>to continue to YouTube Music</p>
+          <p>to continue to MusicTube</p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>

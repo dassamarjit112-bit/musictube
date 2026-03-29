@@ -16,10 +16,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   return (
     <aside className="sidebar">
       <div className="logo-container">
-        <div className="logo-icon">
-          <Play size={20} fill="currentColor" />
+        <div className="logo-icon" style={{ background: "linear-gradient(135deg, #ff0055, #6600ff)", padding: "4px", borderRadius: "20%" }}>
+          <Play size={20} fill="#fff" color="#fff" />
         </div>
-        <span className="logo-text">YouTube Music</span>
+        <span className="logo-text">MusicTube</span>
       </div>
       
       <nav className="nav-links">

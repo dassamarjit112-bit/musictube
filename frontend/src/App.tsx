@@ -10,6 +10,8 @@ import { useYouTubePlayer } from "./useYouTubePlayer";
 import { supabase } from "./lib/supabase";
 import { Auth } from "./components/Auth";
 import { motion, AnimatePresence } from "framer-motion";
+import { ControlledAd } from "./components/ControlledAd";
+import { SubscriptionModal } from "./components/SubscriptionModal";
 import "./App.css";
 
 type View =
@@ -72,6 +74,9 @@ function App() {
   const [activeMenuSong, setActiveMenuSong] = useState<Song | null>(null);
   const [showPlaylistDialog, setShowPlaylistDialog] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+
+  const isPremium = user?.subscription_tier === 'premium';
 
   useEffect(() => {
     const hOnline = () => setIsOffline(false);
@@ -197,7 +202,7 @@ function App() {
     navigator.mediaSession.metadata = new window.MediaMetadata({
       title: currentSong.title,
       artist: currentSong.artist,
-      album: currentSong.album || "YouTube Music",
+      album: currentSong.album || "MusicTube",
       artwork: [
         { src: currentSong.thumbnail, sizes: "96x96", type: "image/png" },
         { src: currentSong.thumbnail, sizes: "128x128", type: "image/png" },
@@ -528,7 +533,7 @@ function App() {
     }
     silentRef.current.play().catch(() => {});
     
-    // NEW: YouTube Music 'Radio' Logic (30+ tracks)
+    // NEW: MusicTube 'Radio' Logic (30+ tracks)
     // If a list was provided (e.g. from an album), use it.
     // Otherwise, generate an AI Radio based on the song clicked.
     if (songList && songList.length > 5) {
@@ -607,9 +612,9 @@ function App() {
 
       {/* Sidebar */}
       <aside className={`sidebar ${isSidebarOpen ? 'mobile-visible' : ''}`}>
-        <div className="logo-section">
-          <Play size={24} fill="#f00" />
-          <span>Music</span>
+        <div className="logo-section" onClick={() => navigateTo({ name: 'home' })} style={{ cursor: 'pointer' }}>
+          <img src="/logo.png" className="logo-img" style={{ width: 28, height: 28 }} alt="" />
+          <span style={{ fontWeight: 800, color: '#fff', marginLeft: 8 }}>MusicTube</span>
           <button className="mobile-only close-sidebar" onClick={() => setIsSidebarOpen(false)}>
             <ArrowLeft size={24} />
           </button>
@@ -666,9 +671,9 @@ function App() {
               <Menu size={24} />
             </button>
             {!isSearchActive ? (
-              <div className="mobile-only mobile-brand">
-                <Play size={24} fill="#f00" />
-                <span>Music</span>
+              <div className="mobile-only mobile-brand" onClick={() => navigateTo({ name: 'home' })}>
+                <img src="/logo.png" style={{ width: 24, height: 24, marginRight: 8 }} alt="" />
+                <span>MusicTube</span>
               </div>
             ) : (
               <div className="mobile-search-active">
@@ -714,8 +719,15 @@ function App() {
           <MoreVertical size={24} />
         </button>
             {isLoggedIn ? (
-              <div className="avatar" onClick={() => setView({ name: 'account' })} style={user?.avatar_url ? { backgroundImage: `url(${user.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center', color: 'transparent' } : {}}>
-                {!user?.avatar_url && (user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}
+              <div className="flex items-center gap-3">
+                {!isPremium && (
+                  <button className="premium-btn desktop-only" onClick={() => setShowSubscriptionModal(true)}>
+                    Upgrade
+                  </button>
+                )}
+                <div className="avatar" onClick={() => setView({ name: 'account' })} style={user?.avatar_url ? { backgroundImage: `url(${user.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center', color: 'transparent' } : {}}>
+                  {!user?.avatar_url && (user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}
+                </div>
               </div>
             ) : (
               <button className="sign-in-btn-sm" style={{ display: /wv|flutter/i.test(navigator.userAgent) || window.location.port === '8080' ? 'none' : 'block' }} onClick={() => setView({ name: 'account' })}>Sign In</button>
@@ -1162,11 +1174,11 @@ function App() {
                               </div>
                             </div>
                           ) : (
-                            <div className="menu-item premium" onClick={() => {}}>
-                              <div className="icon"><Play size={20} fill="#f00" /></div>
+                            <div className="menu-item premium" onClick={() => setShowSubscriptionModal(true)}>
+                              <div className="icon"><Star size={20} fill="#6600ff" color="#6600ff" /></div>
                               <div className="txt">
-                                <h3>Get Music Premium</h3>
-                                <p>Try it free for 1 month</p>
+                                <h3>MusicTube Premium</h3>
+                                <p>{user?.subscription_tier === 'basic' ? 'Upgrade to Pro' : 'Lifetime Access'}</p>
                               </div>
                             </div>
                           )}
@@ -1193,10 +1205,8 @@ function App() {
                   )}
                 </div>
               )}
-            </motion.div>
-          </AnimatePresence>
-
-          {/* ── ARTIST ── */}
+      
+      {/* ── PLAYER ── */}
           {view.name === "artist" && (
             <motion.div 
               className="detail-view"
@@ -1325,9 +1335,18 @@ function App() {
               )}
             </motion.div>
           )}
-
-        </section>
+          {/* End of view checks */}
+          </motion.div>
+        </AnimatePresence>
+      </section>
       </main>
+
+      <SubscriptionModal 
+        user={user} 
+        isOpen={showSubscriptionModal} 
+        onClose={() => setShowSubscriptionModal(false)}
+        onRefreshUser={(u) => setUser(u)}
+      />
 
       {/* ── Player Bar ── */}
       <footer className="player-bar-v2" onClick={() => window.innerWidth < 768 && setShowMobilePlayer(true)}>

@@ -50,17 +50,17 @@ void main() async {
 
   runApp(const MaterialApp(
     debugShowCheckedModeBanner: false,
-    home: YTMApp(),
+    home: MusicTubeApp(),
   ));
 }
 
-class YTMApp extends StatefulWidget {
-  const YTMApp({super.key});
+class MusicTubeApp extends StatefulWidget {
+  const MusicTubeApp({super.key});
   @override
-  State<YTMApp> createState() => _YTMAppState();
+  State<MusicTubeApp> createState() => _MusicTubeAppState();
 }
 
-class _YTMAppState extends State<YTMApp> {
+class _MusicTubeAppState extends State<MusicTubeApp> {
   InAppWebViewController? _webViewController;
 
   @override
