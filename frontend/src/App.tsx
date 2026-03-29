@@ -27,7 +27,13 @@ type View =
   | { name: "player" };
 
 function App() {
-  const [view, setView] = useState<View>({ name: "home" });
+  const [view, setView] = useState<View>(() => {
+    const saved = localStorage.getItem('ytm_user');
+    const u = saved ? JSON.parse(saved) : null;
+    if (!u) return { name: "account" };
+    if (!u.subscription_tier) return { name: "plans" };
+    return { name: "home" };
+  });
   const [homeData, setHomeData] = useState<HomeSection[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -290,11 +296,21 @@ function App() {
 
         localStorage.setItem('ytm_user', JSON.stringify(u));
         setUser(u);
+        
+        // Flow: After login, if no plan, go to plans. Else home.
+        if (!u.subscription_tier) {
+          setView({ name: 'plans' });
+          setShowSubscriptionModal(true);
+        } else {
+          setView({ name: 'home' });
+        }
+
         fetchFavorites(u.id);
         fetchHistory(u.id);
       } else if (_event === 'SIGNED_OUT') {
         setUser(null);
         localStorage.removeItem('ytm_user');
+        setView({ name: 'account' });
       }
     });
 
@@ -597,8 +613,13 @@ function App() {
   const playSong = async (song: Song, songList?: Song[]) => {
     if (!song.videoId) return;
 
-    // Strict Blocking: Only subscribers can play music
-    const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
+    // MANDATORY: User must be logged in and have a plan to play
+    if (!user) {
+      setView({ name: 'account' });
+      return;
+    }
+    
+    const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium' || user?.id === 'flutter_guest_id';
     if (!isSubscribed) {
       setView({ name: 'plans' });
       setShowSubscriptionModal(true);
@@ -703,6 +724,10 @@ function App() {
   };
 
   // ─── Main App ────────────────────────────────────────────────────────────────
+  if (!user && !isWebView) {
+    return <Auth onLogin={setUser} />;
+  }
+
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
       {/* Sidebar Overlay (Mobile) */}
@@ -1672,13 +1697,6 @@ function App() {
           <span>Home</span>
         </button>
         <button 
-          className={view.name === "explore" ? "active" : ""} 
-          onClick={() => navigateTo({ name: "explore" })}
-        >
-          <Compass size={24} />
-          <span>Explore</span>
-        </button>
-        <button 
           className={view.name === "library" ? "active" : ""} 
           onClick={() => isLoggedIn ? navigateTo({ name: "library" }) : setView({ name: 'account' })}
         >
@@ -1714,22 +1732,6 @@ function App() {
           />
         )}
       </AnimatePresence>
-
-      {/* Mobile Bottom Navigation */}
-      <div className="bottom-nav mobile-only">
-        <button onClick={() => setView({ name: 'home' })} className={view.name === 'home' ? 'active' : ''}>
-          <Home size={22} />
-          <span>Home</span>
-        </button>
-        <button onClick={() => setView({ name: 'explore' })} className={view.name === 'explore' ? 'active' : ''}>
-          <Compass size={22} />
-          <span>Explore</span>
-        </button>
-        <button onClick={() => setView({ name: 'library' })} className={view.name === 'library' ? 'active' : ''}>
-          <Library size={22} />
-          <span>Library</span>
-        </button>
-      </div>
 
       <SubscriptionModal 
         user={user} 
