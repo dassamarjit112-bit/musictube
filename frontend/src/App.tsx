@@ -256,14 +256,6 @@ function App() {
 
   // App Session Listener
   useEffect(() => {
-    if (isWebView) {
-      if (user?.id) {
-        fetchFavorites(user.id);
-        fetchHistory(user.id);
-      }
-      return;
-    }
-
     // If already loaded from localStorage, just fetch dependent data
     if (user?.id) {
       fetchFavorites(user.id);
@@ -273,7 +265,7 @@ function App() {
 
     // Fallback: check Supabase session (e.g. after OAuth redirect or page refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user && !isWebView) {
+      if (session?.user) {
         // First sync/fetch user record
         const { data: profile } = await supabase
           .from('profiles')
@@ -619,7 +611,7 @@ function App() {
       return;
     }
     
-    const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium' || user?.id === 'flutter_guest_id';
+    const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
     if (!isSubscribed) {
       setView({ name: 'plans' });
       setShowSubscriptionModal(true);
@@ -767,8 +759,8 @@ function App() {
     }
   }, [isPlaying]);
 
-  // ─── Main App ────────────────────────────────────────────────────────────────
-  if (!user && !isWebView) {
+  // --- Main App ---
+  if (!user) {
     return <Auth onLogin={setUser} />;
   }
 
