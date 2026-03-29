@@ -94,9 +94,9 @@ def fmt_playlist(item):
 @app.route("/api/home")
 def home():
     sections = []
-    # Primary: get_home
+    # Primary: get_home (Increased richness)
     try:
-        results = yt.get_home(limit=8)
+        results = yt.get_home(limit=15)
         for section in results:
             title = section.get("title", "")
             contents = section.get("contents", [])
@@ -107,30 +107,21 @@ def home():
                     if "videoId" in item: t = "song"
                     elif "playlistId" in item: t = "playlist"
                     elif "browseId" in item: t = "playlist" if "author" in item else "artist"
-                    elif "subscribers" in item: t = "artist"
                 
                 if t in ("song", "video"): items.append(fmt_song(item))
                 elif t == "artist": items.append(fmt_artist(item))
                 elif t == "album": items.append(fmt_album(item))
                 elif t == "playlist": items.append(fmt_playlist(item))
-            if items: sections.append({"title": title, "items": items})
+            if len(items) >= 4: sections.append({"title": title, "items": items})
     except: pass
 
-    # Secondary: get_charts
-    if len(sections) < 2:
+    # Charts and Trending Fallbacks (Very Robust)
+    if len(sections) < 3:
         try:
             charts = yt.get_charts(country="ZZ")
             if "songs" in charts:
-                items = [fmt_song(s) for s in limit_items(charts["songs"].get("items", []), 12)]
-                if items: sections.append({"title": "Global Top Songs", "items": items})
-        except: pass
-
-    # Tertiary: Search based hits
-    if len(sections) < 3:
-        try:
-            res = yt.search("Trending Songs", limit=20)
-            items = [fmt_song(i) for i in res if i.get("resultType") == "song"]
-            if items: sections.append({"title": "Trending Music", "items": items[:12]})
+                items = [fmt_song(s) for s in limit_items(charts["songs"].get("items", []), 24)]
+                if items: sections.append({"title": "Global Charts", "items": items})
         except: pass
 
     return jsonify({"sections": sections})
@@ -140,7 +131,8 @@ def search():
     q = request.args.get("q", "")
     if not q: return jsonify({"results": []})
     try:
-        results = yt.search(q, limit=20)
+        # Request more results for a denser list
+        results = yt.search(q, limit=30)
         formatted = []
         for item in results:
             t = item.get("resultType", "")
@@ -149,7 +141,8 @@ def search():
             elif t == "album": formatted.append(fmt_album(item))
             elif t == "playlist": formatted.append(fmt_playlist(item))
         return jsonify({"results": formatted})
-    except: return jsonify({"results": []})
+    except: 
+        return jsonify({"results": []})
 
 @app.route("/api/ping")
 def ping():
