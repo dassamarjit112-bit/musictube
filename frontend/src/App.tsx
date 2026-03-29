@@ -553,78 +553,75 @@ function App() {
     }
   };
 
-  const triggerAutoPlayExtension = async (lastSong: Song) => {
-    try {
-      const res = await api.watch(lastSong.videoId);
-      if (res.tracks && res.tracks.length > 0) {
-        const nextBatch = res.tracks.slice(1, 40);
-        setQueue(prevQueue => {
-          const uBatch = nextBatch.filter(s => !prevQueue.find(sq => sq.videoId === s.videoId));
-          const newQueue = [...prevQueue, ...uBatch];
-          // We must safely move the song forward outside of state setting due to react batching.
-          return newQueue;
-        });
+  
+const triggerAutoPlayExtension = async (lastSong: Song) => {
+  try {
+    const res = await api.watch(lastSong.videoId);
+    if (res.tracks && res.tracks.length > 0) {
+      // Filter out songs already in the queue to prevent loops
+      const currentIds = new Set(queueRef.current.map(s => s.videoId));
+      const filteredTracks = res.tracks.filter(t => !currentIds.has(t.videoId));
+      
+      const nextBatch = filteredTracks.slice(0, 20); // Get a fresh batch of 20
+      
+      setQueue(prev => [...prev, ...nextBatch]);
 
-        // Instantly jump to the first newly appended song to prevent buffering hangs!
-        const nextTarget = nextBatch.find(s => s.videoId !== lastSong.videoId);
-        if (nextTarget) {
-           setCurrentSong(nextTarget);
-           setIsPlaying(true); // Explicitly assert play state for next track
-        }
+      // If the player was actually stopped because it hit the end, start it now
+      if (!isPlayingRef.current) {
+         const firstNewSong = nextBatch[0];
+         if (firstNewSong) {
+           setCurrentSong(firstNewSong);
+           setIsPlaying(true);
+         }
       }
-    } catch (e) {
-      console.error("Auto-play extension failed:", e);
-      setIsPlaying(false);
     }
-  };
-
+  } catch (e) {
+    console.error("Auto-play extension failed:", e);
+  }
+};
+  
   const handleNext = async () => {
-    const q = queueRef.current;
-    if (q.length === 0) return;
-    
-    // Repeat One logic
-    if (repeatMode === 'one' && currentSongRef.current) {
-      ytPlayer.seekTo(0);
-      setIsPlaying(true);
+  const q = queueRef.current;
+  if (q.length === 0) return;
+
+  // 1. Handle Repeat One (Keep this as is)
+  if (repeatMode === 'one' && currentSongRef.current) {
+    ytPlayer.seekTo(0);
+    setIsPlaying(true);
+    return;
+  }
+
+  const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
+  let nextIdx = currentIdx + 1;
+
+  // 2. Logic for selecting the NEXT index
+  if (isShuffle) {
+    nextIdx = Math.floor(Math.random() * q.length);
+  } else if (nextIdx >= q.length) {
+    if (repeatMode === 'all') {
+      nextIdx = 0;
+    } else if (autoPlay) {
+      // TRIGGER: We reached the end, fetch more immediately
+      const lastSong = q[q.length - 1];
+      await triggerAutoPlayExtension(lastSong);
+      return; // The extension function will set the new song
+    } else {
+      setIsPlaying(false);
       return;
     }
+  }
 
-    const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
-    let nextIdx = currentIdx + 1;
-
-    // Advanced Navigation: Shuffle & Repeat All
-    if (isShuffle) {
-      nextIdx = Math.floor(Math.random() * q.length);
-      if (nextIdx === currentIdx && q.length > 1) nextIdx = (nextIdx + 1) % q.length;
-    } else if (nextIdx >= q.length) {
-      if (repeatMode === 'all') {
-        nextIdx = 0;
-      } else if (autoPlay) {
-        // If autoPlay is on and we reached the end, stay on the current song 
-        // until the AI extension logic (below) adds more songs.
-        // We trigger handleNext again after a short delay if songs were added.
-        const lastSong = q[q.length - 1] || currentSongRef.current;
-        if (lastSong) {
-          triggerAutoPlayExtension(lastSong);
-        }
-        return;
-      } else {
-        setIsPlaying(false);
-        return;
-      }
-    }
-    
-    // Proactive AI Radio Extension: Generate more songs BEFORE the queue ends
-    if (autoPlay && nextIdx >= q.length - 5) {
-      const lastSong = q[q.length - 1] || currentSongRef.current;
-      if (lastSong) {
-        triggerAutoPlayExtension(lastSong);
-      }
-    }
-
-    setCurrentSong(q[nextIdx]);
-  };
-
+  // 3. Set the next song
+  const nextSong = q[nextIdx];
+  setCurrentSong(nextSong);
+  
+  // 4. PROACTIVE PRE-FETCH: If we are near the end of the newly updated queue,
+  // fetch the NEXT-NEXT batch so there's never a gap.
+  if (autoPlay && nextIdx >= q.length - 3) {
+    triggerAutoPlayExtension(nextSong);
+  }
+};
+  
   // Always keep the ref pointing at the latest handleNext
   handleNextRef.current = handleNext;
 
@@ -760,51 +757,42 @@ function App() {
     }
   };
 
-  // ─── Web Media Session (Background Controls) ───
   useEffect(() => {
-    if ("mediaSession" in navigator && currentSong) {
-      navigator.mediaSession.metadata = new window.MediaMetadata({
-        title: currentSong.title,
-        artist: currentSong.artist || "MusicTube",
-        album: currentSong.album || "Trending",
-        artwork: [
-          { src: currentSong.thumbnail, sizes: '96x96',   type: 'image/png' },
-          { src: currentSong.thumbnail, sizes: '128x128', type: 'image/png' },
-          { src: currentSong.thumbnail, sizes: '192x192', type: 'image/png' },
-          { src: currentSong.thumbnail, sizes: '256x256', type: 'image/png' },
-          { src: currentSong.thumbnail, sizes: '384x384', type: 'image/png' },
-          { src: currentSong.thumbnail, sizes: '512x512', type: 'image/png' },
-        ]
-      });
+  if (!("mediaSession" in navigator) || !currentSong) return;
 
-      const playHandler = () => setIsPlaying(true);
-      const pauseHandler = () => setIsPlaying(false);
+  navigator.mediaSession.metadata = new window.MediaMetadata({
+    title: currentSong.title,
+    artist: currentSong.artist || "MusicTube",
+    album: currentSong.album || "Trending",
+    artwork: [
+      { src: currentSong.thumbnail, sizes: '512x512', type: 'image/png' },
+    ]
+  });
 
-      navigator.mediaSession.setActionHandler('play', playHandler);
-      navigator.mediaSession.setActionHandler('pause', pauseHandler);
-      navigator.mediaSession.setActionHandler('previoustrack', handlePrev);
-      navigator.mediaSession.setActionHandler('nexttrack', handleNext);
-      
-      try {
-        navigator.mediaSession.setActionHandler('stop', pauseHandler);
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-          if (details.seekTime !== undefined && duration > 0) {
-            const newPos = details.seekTime / duration;
-            setPlayed(newPos);
-            ytPlayer.seekTo(newPos);
-          }
-        });
-      } catch (e) {
-        // Fallback for older browsers
-      }
+  // CRITICAL: Update position state so background play doesn't time out
+  if (duration > 0) {
+    navigator.mediaSession.setPositionState({
+      duration: duration,
+      playbackRate: 1.0,
+      position: playedSeconds,
+    });
+  }
+
+  navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
+  navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
+  navigator.mediaSession.setActionHandler('previoustrack', handlePrev);
+  navigator.mediaSession.setActionHandler('nexttrack', handleNext);
+  
+  // Seek handler for lock-screen progress bars
+  navigator.mediaSession.setActionHandler('seekto', (details) => {
+    if (details.seekTime !== undefined && duration > 0) {
+      const newPos = details.seekTime / duration;
+      setPlayed(newPos);
+      ytPlayer.seekTo(newPos);
     }
-  }, [currentSong, duration]);
-
-  useEffect(() => {
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
-    }
-  }, [isPlaying]);
+  });
+}, [currentSong, duration, playedSeconds]); // Added playedSeconds to update progress on lockscreen
+  
 
   // --- Main App ---
   // App always renders; Auth is shown as a view (account page)
