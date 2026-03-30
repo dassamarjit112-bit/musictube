@@ -625,6 +625,31 @@ const triggerAutoPlayExtension = async (lastSong: Song) => {
     triggerAutoPlayExtension(nextSong);
   }
 };
+const onTogglePlay = useCallback(() => {
+  if (!currentSong) return;
+
+  // Check the actual player state instead of just the React variable
+  if (isPlaying) {
+    ytPlayer.pause();
+    setIsPlaying(false); // Manually sync immediately for UI snappy-ness
+  } else {
+    ytPlayer.play();
+    setIsPlaying(true);
+  }
+}, [isPlaying, currentSong, ytPlayer]);
+    
+  const { load, play, pause, seekTo, setVolume } = useYouTubePlayer("yt-player-container", {
+  onEnded: () => {
+    // Only trigger next if we aren't already in the middle of a change
+    handleNext();
+  },
+  onStateChange: (state) => {
+    // YT.PlayerState.PLAYING is 1, PAUSED is 2
+    if (state === 1) setIsPlaying(true);
+    if (state === 2) setIsPlaying(false);
+  },
+  // ... other options
+});
 
   
   // Always keep the ref pointing at the latest handleNext
