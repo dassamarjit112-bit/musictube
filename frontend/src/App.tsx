@@ -188,10 +188,14 @@ function App() {
   const queueRef = useRef(queue);
   queueRef.current = queue;
 
-  // Ref so onEnded always sees the latest handleNext (fixes stale-closure autoplay bug)
+  const staticCurrentSongId = useRef<string | null>(null);
   const handleNextRef = useRef<() => void>(() => { });
 
   const ytPlayer = useYouTubePlayer("yt-player-container", {
+    onReady: () => {
+      // Force a re-render when player is ready
+      setIsPlaying(p => p);
+    },
     onStateChange: (state) => {
       // YT.PlayerState: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering, 5=cued
       if (state === 1 || state === 3) {
@@ -245,24 +249,40 @@ function App() {
     ytPlayer.setVolume(isMuted ? 0 : volume);
   }, [volume, isMuted, ytPlayer]);
 
-  // Play/pause sync with local state
+  // ─── Unified Playback Controller ───
+  // This effect handles loading new songs AND syncing play/pause state
   useEffect(() => {
-    if (!currentSong) return;
-    const playerState = ytPlayer.player?.getPlayerState?.();
+    if (!currentSong?.videoId) return;
+
+    const player = ytPlayer.player;
+    const playerState = player?.getPlayerState?.();
+
+    // If song changed, load it
+    staticCurrentSongId.current = staticCurrentSongId.current || "";
+    if (staticCurrentSongId.current !== currentSong.videoId) {
+      staticCurrentSongId.current = currentSong.videoId;
+      setPlayerError(null);
+      ytPlayer.load(currentSong.videoId);
+      return;
+    }
+
+    // Sync isPlaying with actual player state
+    if (!player) return;
+    
     if (isPlaying) {
-      if (playerState !== 1 && playerState !== 3) ytPlayer.play();
+      // If we want to play but player is paused or ended
+      if (playerState === 2 || playerState === 0 || playerState === 5 || playerState === -1) {
+        ytPlayer.play();
+      }
     } else {
-      if (playerState !== 2) ytPlayer.pause();
+      // If we want to pause but player is playing or buffering
+      if (playerState === 1 || playerState === 3) {
+        ytPlayer.pause();
+      }
     }
   }, [isPlaying, currentSong?.videoId, ytPlayer]);
 
-  // Load new song
-  useEffect(() => {
-    if (!currentSong?.videoId) return;
-    setPlayerError(null);
-    ytPlayer.load(currentSong.videoId);
-    setIsPlaying(true);
-  }, [currentSong?.videoId, ytPlayer]);
+
 
   // ─── Media Session & Notifications ───
   useEffect(() => {

@@ -2,7 +2,7 @@
  * useYouTubePlayer – wraps the YouTube IFrame API directly.
  * Improved for stability and control responsive-ness.
  */
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 
 declare global {
   interface Window {
@@ -157,14 +157,24 @@ export function useYouTubePlayer(
   ); 
  
   const play = useCallback(() => {
-    if (!isReadyRef.current) return;
-    try { playerRef.current?.playVideo(); } catch {}
+    try {
+      if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
+        playerRef.current.playVideo();
+      }
+    } catch (e) {
+      console.warn("Play command failed", e);
+    }
   }, []);
 
   const pause = useCallback(() => {
-    if (!isReadyRef.current) return;
-    try { playerRef.current?.pauseVideo(); } catch {}
-    stopProgress();
+    try {
+      if (playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
+        playerRef.current.pauseVideo();
+      }
+      stopProgress();
+    } catch (e) {
+      console.warn("Pause command failed", e);
+    }
   }, [stopProgress]);
 
   const seekTo = useCallback((fraction: number) => {
@@ -191,13 +201,13 @@ export function useYouTubePlayer(
     }
   }, []);
 
-  return { 
+  return useMemo(() => ({ 
     load, 
-    cue, // Add this
+    cue, 
     play, 
     pause, 
     seekTo, 
     setVolume, 
     player: playerRef.current 
-  };
+  }), [load, cue, play, pause, seekTo, setVolume, playerRef.current]);
 }
