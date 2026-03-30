@@ -2,7 +2,7 @@
  * useYouTubePlayer – wraps the YouTube IFrame API directly.
  * Improved for stability and control responsive-ness.
  */
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useCallback, useMemo, useState } from "react";
 
 declare global {
   interface Window {
@@ -41,6 +41,7 @@ export function useYouTubePlayer(
   options: YTPlayerOptions
 ) {
   const playerRef = useRef<any>(null);
+  const [playerInstance, setPlayerInstance] = useState<any>(null);
   const isReadyRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
@@ -71,22 +72,36 @@ export function useYouTubePlayer(
     }, 500);
   }, [stopProgress]);
 
+  const onStateChange = (e: any) => {
+    const state = e.data;
+    optionsRef.current.onStateChange?.(state);
+
+    // YouTube State Codes: 1 is PLAYING, 3 is BUFFERING
+    if (state === 1 || state === 3) {
+      startProgress();
+    } else {
+      stopProgress();
+    }
+
+    if (state === 0) {
+      optionsRef.current.onEnded?.();
+    }
+  };
+
   const initPlayer = useCallback(
     (videoId: string) => {
       const container = document.getElementById(containerId);
       if (!container) return;
 
-      // If player exists but not same video, or just needs a load
       if (playerRef.current && isReadyRef.current) {
         try {
           playerRef.current.loadVideoById(videoId);
           return;
         } catch (e) {
-          console.error("Failed to load video by id, re-creating player", e);
+          console.error("Re-creation fallback", e);
         }
       }
 
-      // Destroy old instance if any
       if (playerRef.current) {
         try { playerRef.current.destroy(); } catch {}
       }
@@ -106,30 +121,15 @@ export function useYouTubePlayer(
         events: {
           onReady: () => {
             isReadyRef.current = true;
+            setPlayerInstance(playerRef.current);
             optionsRef.current.onReady?.();
           },
-          onStateChange: (e: any) => {
-  const state = e.data;
-  optionsRef.current.onStateChange?.(state);
-
-  // Stop the "on/off" loop by only reacting to definitive states
-  if (state === (window as any).YT.PlayerState.PLAYING) {
-    startProgress();
-  } else {
-    stopProgress();
-  }
-
-  // If the video ends, trigger next
-  if (state === (window as any).YT.PlayerState.ENDED) {
-    optionsRef.current.onEnded?.();
-  }
-},
-
-          onError: (e: any) => {
-            optionsRef.current.onError?.(e.data);
-          },
+          onStateChange: (e: any) => onStateChange(e),
+          onError: (e: any) => optionsRef.current.onError?.(e.data),
         },
       });
+      // Set instance immediately so it's not null, though it might not be ready
+      setPlayerInstance(playerRef.current);
     },
     [containerId, startProgress, stopProgress]
   );
@@ -208,6 +208,6 @@ export function useYouTubePlayer(
     pause, 
     seekTo, 
     setVolume, 
-    player: playerRef.current 
-  }), [load, cue, play, pause, seekTo, setVolume, playerRef.current]);
+    player: playerInstance 
+  }), [load, cue, play, pause, seekTo, setVolume, playerInstance]);
 }

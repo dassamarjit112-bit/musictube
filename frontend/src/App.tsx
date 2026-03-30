@@ -204,11 +204,11 @@ function App() {
       } else if (state === 2 || state === 0) {
         setIsPlaying(false);
         if (state === 0) handleNextRef.current();
-      } else if ((state === -1 || state === 5) && isPlayingRef.current) {
-        // Stuck state bridging
+      } else if (state === -1 && isPlayingRef.current) {
+        // Only bridge from UNSTARTED to prevent cued state loops
         setTimeout(() => {
           if (isPlayingRef.current) ytPlayer.play();
-        }, 800);
+        }, 1000);
       }
     },
     onProgress: (p, secs) => {
@@ -228,8 +228,8 @@ function App() {
       setPlayerError(msg);
       setTimeout(() => {
         setPlayerError(null);
-        handleNext();
-      }, 2500);
+        handleNext(); // Auto-skip restricted/broken tracks
+      }, 1000); // Speed up the bounce
     },
   });
 
@@ -687,18 +687,23 @@ function App() {
   const playSong = async (song: Song, songList?: Song[]) => {
     if (!song.videoId) return;
 
-    // Must be logged in (not a guest) to play
+    // Logged in (not a guest) restriction removed for testing/UX fluidity
+    /*
     if (!user || user.isGuest) {
       setView({ name: 'account' });
       return;
     }
+    */
 
+    // Subscription requirement removed for testing
+    /*
     const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
     if (!isSubscribed) {
       setShowSubscriptionModal(true);
       setView({ name: 'plans' });
       return;
     }
+    */
 
     console.log("▶ Playing:", song.title, "| videoId:", song.videoId);
 
@@ -1734,8 +1739,8 @@ function App() {
         initialGiftCode={giftCodeToClaim}
       />
 
-      {/* Player Bar - Only visible to subscribers */}
-      {(user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium') && (
+      {/* Player Bar - Visible if song is selected */}
+      {currentSong && (
         <footer className="player-bar-v2" onClick={() => navigateTo({ name: 'player' })}>
           <div className="mini-player-bg" style={{ backgroundImage: currentSong ? `url(${currentSong.thumbnail})` : 'none' }} />
           <div className="progress-bar-container">
