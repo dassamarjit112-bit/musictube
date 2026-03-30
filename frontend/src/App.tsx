@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
   Volume2, ThumbsUp, MoreVertical, Search,
-  Home, Compass, Library, PlusCircle, ArrowLeft, Music2, Menu
+  Home, Compass, Library, PlusCircle, ArrowLeft, Music2, Menu, ShieldCheck, Lock
 } from "lucide-react";
 import { api } from "./api";
 import type { Song, HomeSection, SearchResult, ArtistDetail, AlbumDetail } from "./api";
@@ -1499,7 +1499,7 @@ function App() {
                         </div>
 
                         <div className="acc-card-v3">
-                          <h3>Account Security</h3>
+                          <h3><ShieldCheck size={18} /> Account Security</h3>
                           <p className="subtext">Set or update your login password.</p>
                           <form 
                             className="acc-claim-row-v3"
@@ -1515,12 +1515,16 @@ function App() {
                               }
                             }}
                           >
-                            <input
-                              type="password"
-                              name="newPassword"
-                              placeholder="New password"
-                              required
-                            />
+                            <div className="input-with-icon-v3" style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                              <Lock size={16} style={{ opacity: 0.5 }} />
+                              <input
+                                type="password"
+                                name="newPassword"
+                                placeholder="New password"
+                                style={{ background: 'none', border: 'none', color: '#fff', outline: 'none', flex: 1 }}
+                                required
+                              />
+                            </div>
                             <button type="submit">Update</button>
                           </form>
                         </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, ShieldCheck, Monitor, Mail, Lock, User, AtSign, ArrowRight, UserPlus, LogIn, ChevronLeft } from 'lucide-react';
+import { Headphones, ShieldCheck, Lock, User, AtSign, ArrowRight, UserPlus, LogIn, ChevronLeft } from 'lucide-react';
 
 interface AuthProps {
   onLogin: (user: any) => void;
