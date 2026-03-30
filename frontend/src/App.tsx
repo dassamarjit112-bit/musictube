@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
-  Volume2, ThumbsUp, MoreVertical, Search,
+  Volume2, ThumbsUp, MoreVertical, Search, Download,
   Home, Compass, Library, PlusCircle, ArrowLeft, Music2, Menu, ShieldCheck, Lock, Shield
 } from "lucide-react";
 import { api } from "./api";
