@@ -197,6 +197,122 @@ function App() {
   const staticCurrentSongId = useRef<string | null>(null);
   const handleNextRef = useRef<() => void>(() => { });
 
+  const handleNext = async () => {
+    const q = queueRef.current;
+    if (q.length === 0) return;
+
+    const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
+    let nextIdx = currentIdx + 1;
+
+    // 1. Logic for Shuffle
+    if (isShuffle) {
+      nextIdx = Math.floor(Math.random() * q.length);
+    }
+
+    // 2. Logic for reaching the end of the manual queue
+    if (nextIdx >= q.length) {
+      if (repeatMode === 'all') {
+        nextIdx = 0;
+      } else if (autoPlay) {
+        // THIS IS THE FORCE: Fetch next songs from the API automatically
+        const lastSong = q[q.length - 1];
+        await triggerAutoPlayExtension(lastSong);
+        return;
+      } else {
+        setIsPlaying(false);
+        return;
+      }
+    }
+
+    // 3. Set the song and force play
+    const nextSong = q[nextIdx];
+    setCurrentSong(nextSong);
+    setIsPlaying(true);
+
+    // 4. Proactive Fetching: If we are near the end, get more songs NOW
+    if (autoPlay && nextIdx >= q.length - 3) {
+      triggerAutoPlayExtension(nextSong);
+    }
+  };
+
+  // Always keep the ref pointing at the latest handleNext
+  handleNextRef.current = handleNext;
+
+  const handlePrev = () => {
+    if (playedSeconds > 3) {
+      ytPlayer.seekTo(0);
+      return;
+    }
+    const q = queueRef.current;
+    const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
+    if (currentIdx > 0) {
+      setCurrentSong(q[currentIdx - 1]);
+    } else if (repeatMode === 'all' && q.length > 0) {
+      setCurrentSong(q[q.length - 1]);
+    }
+  };
+
+  const triggerAutoPlayExtension = async (lastSong: Song) => {
+    try {
+      const res = await api.watch(lastSong.videoId);
+      if (res.tracks && res.tracks.length > 0) {
+        // Filter out songs already in the queue to prevent loops
+        const currentIds = new Set(queueRef.current.map(s => s.videoId));
+        const filteredTracks = res.tracks.filter(t => !currentIds.has(t.videoId));
+
+        const nextBatch = filteredTracks.slice(0, 20); // Get a fresh batch of 20
+
+        setQueue(prev => [...prev, ...nextBatch]);
+
+        // If the player was actually stopped because it hit the end, start it now
+        if (!isPlayingRef.current) {
+          const firstNewSong = nextBatch[0];
+          if (firstNewSong) {
+            setCurrentSong(firstNewSong);
+            setIsPlaying(true);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Auto-play extension failed:", e);
+    }
+  };
+
+  const playSong = async (song: Song, songList?: Song[]) => {
+    if (!song.videoId) return;
+
+    console.log("▶ Playing:", song.title, "| videoId:", song.videoId);
+
+    // Set immediate song to start playback
+    if (isOffline && !downloads.some(d => d.videoId === song.videoId)) {
+      setPlayerError("You are offline. Only downloaded songs can be played.");
+      setTimeout(() => setPlayerError(null), 3000);
+      return;
+    }
+
+    if (song.videoId === currentSongRef.current?.videoId) {
+      ytPlayer.seekTo(0);
+      ytPlayer.play();
+    }
+    setCurrentSong(song);
+    setIsPlaying(true);
+    setPlayed(0);
+    setPlayedSeconds(0);
+    setDuration(0);
+    logHistory(song);
+
+    // Initialize/Restart Silent Audio on User Interaction (CRITICAL FOR BACKGROUND PLAY)
+    if (!silentRef.current) {
+      silentRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+');
+      silentRef.current.loop = true;
+    }
+    silentRef.current.play().catch(() => { });
+
+    if (songList && songList.length > 0) {
+      setQueue(songList);
+    }
+  };
+
   const ytPlayer = useYouTubePlayer("yt-player-container", {
     onReady: () => {
       // Force a re-render when player is ready
@@ -254,7 +370,7 @@ function App() {
       setPlayerError(msg);
       setTimeout(() => {
         setPlayerError(null);
-        handleNext(); // Auto-skip restricted/broken tracks
+        handleNextRef.current(); // Auto-skip restricted/broken tracks
       }, 1000); // Speed up the bounce
     },
   });
@@ -306,53 +422,66 @@ function App() {
         ytPlayer.pause();
       }
     }
-  }, [isPlaying, currentSong?.videoId, ytPlayer]);
+  }, [isPlaying, currentSong]);
 
-
-
-  // ─── Media Session Metadata & State (Frequent Updates) ───
+  // ─── Media Session Metadata (Stable & Informative) ───
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentSong) return;
     
-    // Update simple metadata
-    navigator.mediaSession.metadata = new window.MediaMetadata({
+    // Explicitly set metadata to enable system-level player controls
+    navigator.mediaSession.metadata = new MediaMetadata({
       title: currentSong.title,
-      artist: currentSong.artist || "MusicTube",
-      album: currentSong.album || "MusicTube",
+      artist: currentSong.artist,
+      album: currentSong.album || 'MusicTube',
       artwork: [
-        { src: currentSong.thumbnail, sizes: "96x96", type: "image/png" },
-        { src: currentSong.thumbnail, sizes: "128x128", type: "image/png" },
-        { src: currentSong.thumbnail, sizes: "192x192", type: "image/png" },
-        { src: currentSong.thumbnail, sizes: "256x256", type: "image/png" },
-        { src: currentSong.thumbnail, sizes: "384x384", type: "image/png" },
-        { src: currentSong.thumbnail, sizes: "512x512", type: "image/png" },
+        { src: currentSong.thumbnail, sizes: '512x512', type: 'image/jpeg' },
+        { src: currentSong.thumbnail, sizes: '192x192', type: 'image/jpeg' },
       ],
     });
+  }, [currentSong]); // Metadata only changes when song changes
 
-    // Update position state for lockscreen progress
-    if (duration > 0 && isFinite(playedSeconds)) {
-      try {
-        navigator.mediaSession.setPositionState({
-          duration: duration,
-          playbackRate: 1.0,
-          position: Math.max(0, Math.min(playedSeconds, duration)),
-        });
-      } catch (e) { console.warn("MediaSession position update failed", e); }
+  // ─── Media Session Position State (Frequent Updates) ───
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !currentSong || duration <= 0) return;
+    
+    // The "Position State" heartbeat helps keep the lock-screen player alive
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: duration,
+        playbackRate: 1.0,
+        position: Math.max(0, Math.min(playedSeconds, duration)),
+      });
+    } catch (e) { 
+      // Some browsers might throw if duration/position is invalid
     }
+  }, [duration, playedSeconds, currentSong]);
 
-    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-  }, [currentSong, isPlaying, duration, playedSeconds]);
+  // Sync Global Playback State
+  useEffect(() => {
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+    }
+  }, [isPlaying]);
 
   // ─── Media Session Handlers (Stable) ───
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
 
     const nav = navigator.mediaSession;
-    nav.setActionHandler("play", () => setIsPlaying(true));
-    nav.setActionHandler("pause", () => setIsPlaying(false));
+    nav.setActionHandler("play", () => {
+      ytPlayer.play();
+      setIsPlaying(true);
+      silentRef.current?.play().catch(() => {});
+    });
+    nav.setActionHandler("pause", () => {
+      ytPlayer.pause();
+      setIsPlaying(false);
+      silentRef.current?.pause();
+    });
     nav.setActionHandler("previoustrack", () => handlePrev());
     nav.setActionHandler("nexttrack", () => handleNext());
     
+    // Position sync
     nav.setActionHandler("seekbackward", (details) => {
       const skipTime = details.seekOffset || 10;
       ytPlayer.seekTo(Math.max(0, (playedSeconds - skipTime) / duration));
@@ -370,12 +499,20 @@ function App() {
     });
 
     return () => {
-      // Cleanup handlers to prevent memory leaks or ghost controls
       [ "play", "pause", "previoustrack", "nexttrack", "seekbackward", "seekforward", "seekto"].forEach(
         (action: any) => nav.setActionHandler(action, null)
       );
     }
-  }, [ytPlayer, duration, playedSeconds]); // Still need some deps but less frequent than re-running metadata logic
+  }, [ytPlayer, duration, playedSeconds, handleNext, handlePrev]);
+
+  // Use silent audio to trick mobile browsers into keeping process alive
+  useEffect(() => {
+    if (isPlaying && currentSong) {
+      silentRef.current?.play().catch(() => { });
+    } else {
+      silentRef.current?.pause();
+    }
+  }, [isPlaying, currentSong]);
 
 
   // ─── Persistent System Notification (Secondary Controls) ───
@@ -392,16 +529,18 @@ function App() {
 
       if (isPlaying) {
         reg.showNotification(currentSong.title, {
-          body: `${currentSong.artist} • ${currentSong.album || 'Now Playing'}`,
+          body: `🎵 ${currentSong.artist} • ${currentSong.album || 'MusicTube'}`,
           icon: currentSong.thumbnail,
-          badge: '/logo.png',
+          image: currentSong.thumbnail, // HERO image for beauty!
+          badge: '/favicon.png',
           tag: 'musictube-player',
-          silent: true, // Don't beep on every state change!
-          requireInteraction: true, // Keep it visible!
+          silent: true,
+          requireInteraction: true,
           data: { videoId: currentSong.videoId },
           actions: [
-            { action: isPlaying ? 'pause' : 'play', title: isPlaying ? 'Pause' : 'Play' },
-            { action: 'next', title: 'Next' }
+            { action: isPlaying ? 'pause' : 'play', title: isPlaying ? '⏸ Pause' : '▶ Play' },
+            { action: 'next', title: '⏭ Next' },
+            { action: 'prev', title: '⏮ Prev' }
           ]
         } as any);
       }
@@ -412,6 +551,25 @@ function App() {
 
   // Listener for actions in sw.js would be needed for buttons to work, 
   // but most users will use the standard Media Session controls in the tray.
+
+  // ─── Notification Action Dispatcher ───
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    
+    const hMsg = (event: MessageEvent) => {
+      if (event.data?.type === 'notification-action') {
+        const action = event.data.action;
+        if (action === 'play') setIsPlaying(true);
+        if (action === 'pause') setIsPlaying(false);
+        if (action === 'next') handleNext();
+        if (action === 'prev') handlePrev();
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', hMsg);
+    return () => navigator.serviceWorker.removeEventListener('message', hMsg);
+  }, []); // Stable handlers
+
 
   // App Session Listener
   useEffect(() => {
@@ -679,159 +837,7 @@ function App() {
       setIsSearching(false);
     }
   };
-
-
-  const triggerAutoPlayExtension = async (lastSong: Song) => {
-    try {
-      const res = await api.watch(lastSong.videoId);
-      if (res.tracks && res.tracks.length > 0) {
-        // Filter out songs already in the queue to prevent loops
-        const currentIds = new Set(queueRef.current.map(s => s.videoId));
-        const filteredTracks = res.tracks.filter(t => !currentIds.has(t.videoId));
-
-        const nextBatch = filteredTracks.slice(0, 20); // Get a fresh batch of 20
-
-        setQueue(prev => [...prev, ...nextBatch]);
-
-        // If the player was actually stopped because it hit the end, start it now
-        if (!isPlayingRef.current) {
-          const firstNewSong = nextBatch[0];
-          if (firstNewSong) {
-            setCurrentSong(firstNewSong);
-            setIsPlaying(true);
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Auto-play extension failed:", e);
-    }
-  };
-  const handleNext = async () => {
-    const q = queueRef.current;
-    if (q.length === 0) return;
-
-    const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
-    let nextIdx = currentIdx + 1;
-
-    // 1. Logic for Shuffle
-    if (isShuffle) {
-      nextIdx = Math.floor(Math.random() * q.length);
-    }
-
-    // 2. Logic for reaching the end of the manual queue
-    if (nextIdx >= q.length) {
-      if (repeatMode === 'all') {
-        nextIdx = 0;
-      } else if (autoPlay) {
-        // THIS IS THE FORCE: Fetch next songs from the API automatically
-        const lastSong = q[q.length - 1];
-        await triggerAutoPlayExtension(lastSong);
-        return;
-      } else {
-        setIsPlaying(false);
-        return;
-      }
-    }
-
-    // 3. Set the song and force play
-    const nextSong = q[nextIdx];
-    setCurrentSong(nextSong);
-    setIsPlaying(true);
-
-    // 4. Proactive Fetching: If we are near the end, get more songs NOW
-    if (autoPlay && nextIdx >= q.length - 3) {
-      triggerAutoPlayExtension(nextSong);
-    }
-  };
-
-
-
-  // Always keep the ref pointing at the latest handleNext
-  handleNextRef.current = handleNext;
-
-  const handlePrev = () => {
-    if (playedSeconds > 3) {
-      ytPlayer.seekTo(0);
-      return;
-    }
-    const q = queueRef.current;
-    const currentIdx = q.findIndex((s) => s.videoId === currentSongRef.current?.videoId);
-    if (currentIdx > 0) {
-      setCurrentSong(q[currentIdx - 1]);
-    } else if (repeatMode === 'all' && q.length > 0) {
-      setCurrentSong(q[q.length - 1]);
-    }
-  };
-
-  const playSong = async (song: Song, songList?: Song[]) => {
-    if (!song.videoId) return;
-
-    // Logged in (not a guest) restriction removed for testing/UX fluidity
-    /*
-    if (!user || user.isGuest) {
-      setView({ name: 'account' });
-      return;
-    }
-    */
-
-    // Subscription requirement removed for testing
-    /*
-    const isSubscribed = user?.subscription_tier === 'basic' || user?.subscription_tier === 'premium';
-    if (!isSubscribed) {
-      setShowSubscriptionModal(true);
-      setView({ name: 'plans' });
-      return;
-    }
-    */
-
-    console.log("▶ Playing:", song.title, "| videoId:", song.videoId);
-
-    // Set immediate song to start playback
-    if (isOffline && !downloads.some(d => d.videoId === song.videoId)) {
-      setPlayerError("You are offline. Only downloaded songs can be played.");
-      setTimeout(() => setPlayerError(null), 3000);
-      return;
-    }
-
-    if (song.videoId === currentSongRef.current?.videoId) {
-      ytPlayer.seekTo(0);
-      ytPlayer.play();
-    }
-    setCurrentSong(song);
-    setIsPlaying(true);
-    setPlayed(0);
-    setPlayedSeconds(0);
-    setDuration(0);
-    logHistory(song);
-
-    // Initialize/Restart Silent Audio on User Interaction (CRITICAL FOR BACKGROUND PLAY)
-    if (!silentRef.current) {
-      silentRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+');
-      silentRef.current.loop = true;
-    }
-    silentRef.current.play().catch(() => { });
-
-    // AI Radio / Up Next Generator
-    if (songList && songList.length > 10) {
-      setQueue(songList);
-    } else {
-      console.log("🔮 Infinite Radio Initializing for:", song.title);
-      try {
-        const res = await api.watch(song.videoId);
-        if (res.tracks && res.tracks.length > 5) {
-          // Flattening and diversifying the list (YouTube Music Style: 30+ Tracks)
-          const radioMix = [song, ...res.tracks.slice(1, 45)];
-          setQueue(radioMix);
-        } else {
-          setQueue(prev => prev.some(s => s.videoId === song.videoId) ? prev : [...prev, song]);
-        }
-      } catch (e) {
-        console.error("Radio Generation Failed:", e);
-        setQueue(prev => prev.some(s => s.videoId === song.videoId) ? prev : [...prev, song]);
-      }
-    }
-  };
-
+  // Chip navigation
   const handleChipClick = async (chip: string) => {
     setActiveChip(chip);
     try {
@@ -1952,6 +1958,14 @@ function App() {
           />
         )}
       </AnimatePresence>
+
+      <audio 
+        ref={silentRef} 
+        src="data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+" 
+        loop 
+        muted 
+        style={{ display: 'none' }} 
+      />
     </div>
   );
 }

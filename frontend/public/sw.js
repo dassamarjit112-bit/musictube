@@ -47,15 +47,30 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Handle notification interaction (optional if using Media Session API, but good for completeness)
+// Handle notification interaction
 self.addEventListener('notificationclick', (event) => {
+  const action = event.action;
+  
+  // Close the notification
   event.notification.close();
+  
   event.waitUntil(
     clients.matchAll({ type: 'window' }).then((clientList) => {
-      if (clientList.length > 0) {
-        return clientList[0].focus();
+      // If no action clicked, just focus existing window or open new
+      if (!action) {
+        if (clientList.length > 0) return clientList[0].focus();
+        return clients.openWindow('/');
       }
-      return clients.openWindow('/');
+
+      // If action clicked (play, pause, next, prev), tell the client
+      if (clientList.length > 0) {
+        clientList.forEach((client) => {
+          client.postMessage({
+            type: 'notification-action',
+            action: action
+          });
+        });
+      }
     })
   );
 });
