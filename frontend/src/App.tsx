@@ -203,11 +203,11 @@ function App() {
         // Track ended
         setIsPlaying(false);
         handleNextRef.current();
-      } else if ((state === -1 || state === 5 || state === 3) && isPlayingRef.current) {
-        // Auto-play bridging: IFrame API often gets "stuck" unstarted/cued/buffering on mobile track changes.
+      } else if ((state === -1 || state === 5) && isPlayingRef.current) {
+        // Auto-play bridging for stuck states (avoiding state 3 / buffering loop)
         setTimeout(() => {
           if (isPlayingRef.current) ytPlayer.play();
-        }, 300);
+        }, 500);
       }
     },
     onProgress: (p, secs) => {
@@ -215,7 +215,7 @@ function App() {
       setPlayedSeconds(secs);
     },
     onDuration: (d) => setDuration(d),
-    onEnded: () => handleNextRef.current(),
+    // Removed onEnded here because it's handled in onStateChange above to avoid double calls
     onError: (code) => {
       console.error("YouTube player error code:", code);
       const msg =
@@ -248,12 +248,16 @@ function App() {
     ytPlayer.setVolume(isMuted ? 0 : volume);
   }, [volume, isMuted, ytPlayer]);
 
-  // Play/pause sync
+  // Play/pause sync with local state
   useEffect(() => {
     if (!currentSong) return;
-    if (isPlaying) ytPlayer.play();
-    else ytPlayer.pause();
-  }, [isPlaying, currentSong, ytPlayer]);
+    const playerState = ytPlayer.player?.getPlayerState?.();
+    if (isPlaying) {
+      if (playerState !== 1 && playerState !== 3) ytPlayer.play();
+    } else {
+      if (playerState !== 2) ytPlayer.pause();
+    }
+  }, [isPlaying, currentSong?.videoId, ytPlayer]);
 
   // Load new song
   useEffect(() => {
@@ -263,12 +267,13 @@ function App() {
     setIsPlaying(true);
   }, [currentSong?.videoId, ytPlayer]);
 
-  // Media session
+  // ─── Media Session & Notifications ───
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentSong) return;
+    
     navigator.mediaSession.metadata = new window.MediaMetadata({
       title: currentSong.title,
-      artist: currentSong.artist,
+      artist: currentSong.artist || "MusicTube",
       album: currentSong.album || "MusicTube",
       artwork: [
         { src: currentSong.thumbnail, sizes: "96x96", type: "image/png" },
@@ -279,21 +284,38 @@ function App() {
         { src: currentSong.thumbnail, sizes: "512x512", type: "image/png" },
       ],
     });
+
+    // Update position state for lockscreen progress
+    if (duration > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: duration,
+          playbackRate: 1.0,
+          position: Math.min(playedSeconds, duration),
+        });
+      } catch (e) { console.warn("MediaSession position update failed", e); }
+    }
+
     navigator.mediaSession.setActionHandler("play", () => setIsPlaying(true));
     navigator.mediaSession.setActionHandler("pause", () => setIsPlaying(false));
-    navigator.mediaSession.setActionHandler("previoustrack", handlePrev);
-    navigator.mediaSession.setActionHandler("nexttrack", handleNext);
+    navigator.mediaSession.setActionHandler("previoustrack", () => handlePrev());
+    navigator.mediaSession.setActionHandler("nexttrack", () => handleNext());
     navigator.mediaSession.setActionHandler("seekbackward", () => {
-      ytPlayer.seekTo(Math.max(0, playedSeconds - 10));
+      ytPlayer.seekTo(Math.max(0, (playedSeconds - 10) / duration));
     });
     navigator.mediaSession.setActionHandler("seekforward", () => {
-      ytPlayer.seekTo(Math.min(duration, playedSeconds + 10));
+      ytPlayer.seekTo(Math.min(0.99, (playedSeconds + 10) / duration));
+    });
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime !== undefined && duration > 0) {
+        const newPos = details.seekTime / duration;
+        setPlayed(newPos);
+        ytPlayer.seekTo(newPos);
+      }
     });
 
-    // Smooth Android Playback
-    if (isPlaying) navigator.mediaSession.playbackState = 'playing';
-    else navigator.mediaSession.playbackState = 'paused';
-  }, [currentSong, ytPlayer, playedSeconds, duration, isPlaying]);
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [currentSong, isPlaying, duration, playedSeconds, ytPlayer]);
 
   // App Session Listener
   useEffect(() => {
@@ -768,41 +790,8 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    if (!("mediaSession" in navigator) || !currentSong) return;
+  // (Consolidated into the effect above)
 
-    navigator.mediaSession.metadata = new window.MediaMetadata({
-      title: currentSong.title,
-      artist: currentSong.artist || "MusicTube",
-      album: currentSong.album || "Trending",
-      artwork: [
-        { src: currentSong.thumbnail, sizes: '512x512', type: 'image/png' },
-      ]
-    });
-
-    // CRITICAL: Update position state so background play doesn't time out
-    if (duration > 0) {
-      navigator.mediaSession.setPositionState({
-        duration: duration,
-        playbackRate: 1.0,
-        position: playedSeconds,
-      });
-    }
-
-    navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
-    navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
-    navigator.mediaSession.setActionHandler('previoustrack', handlePrev);
-    navigator.mediaSession.setActionHandler('nexttrack', handleNext);
-
-    // Seek handler for lock-screen progress bars
-    navigator.mediaSession.setActionHandler('seekto', (details) => {
-      if (details.seekTime !== undefined && duration > 0) {
-        const newPos = details.seekTime / duration;
-        setPlayed(newPos);
-        ytPlayer.seekTo(newPos);
-      }
-    });
-  }, [currentSong, duration, playedSeconds]); // Added playedSeconds to update progress on lockscreen
 
 
   // --- Main App ---
