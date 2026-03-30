@@ -139,7 +139,17 @@ export function useYouTubePlayer(
     };
   }, [stopProgress]);
 
-  
+ const load = useCallback(
+    (videoId: string) => {
+      if (!videoId) return;
+      if (window.YT && window.YT.Player) {
+        initPlayer(videoId); // This resolves the TS6133 error
+      } else {
+        apiReadyCallbacks.push(() => initPlayer(videoId));
+      }
+    },
+    [initPlayer]
+  ); 
  const cue = useCallback(
   (videoId: string) => {
     if (!videoId || !isReadyRef.current) return;
