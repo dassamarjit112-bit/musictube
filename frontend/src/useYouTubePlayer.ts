@@ -109,17 +109,22 @@ export function useYouTubePlayer(
             optionsRef.current.onReady?.();
           },
           onStateChange: (e: any) => {
-            const state: number = e.data;
-            optionsRef.current.onStateChange?.(state);
-            if (state === window.YT.PlayerState.PLAYING) {
-              startProgress();
-            } else {
-              stopProgress();
-            }
-            if (state === window.YT.PlayerState.ENDED) {
-              optionsRef.current.onEnded?.();
-            }
-          },
+  const state = e.data;
+  optionsRef.current.onStateChange?.(state);
+
+  // Stop the "on/off" loop by only reacting to definitive states
+  if (state === (window as any).YT.PlayerState.PLAYING) {
+    startProgress();
+  } else {
+    stopProgress();
+  }
+
+  // If the video ends, trigger next
+  if (state === (window as any).YT.PlayerState.ENDED) {
+    optionsRef.current.onEnded?.();
+  }
+},
+
           onError: (e: any) => {
             optionsRef.current.onError?.(e.data);
           },
