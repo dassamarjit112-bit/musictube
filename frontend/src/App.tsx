@@ -1030,16 +1030,25 @@ function App() {
             {isLoggedIn ? (
               <div className="flex items-center gap-3">
                 {!isPremium && (
-                  <button className="premium-btn desktop-only" onClick={() => setShowSubscriptionModal(true)}>
+                  <button className="upgrade-pill desktop-only" onClick={() => setShowSubscriptionModal(true)}>
                     Upgrade
                   </button>
                 )}
-                <div className="avatar" onClick={() => setView({ name: 'account' })} style={user?.avatar_url ? { backgroundImage: `url(${user.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center', color: 'transparent' } : {}}>
-                  {!user?.avatar_url && (user?.full_name?.[0] || user?.email?.[0] || '?').toUpperCase()}
+                <div 
+                  className="user-profile-btn" 
+                  onClick={() => setView({ name: 'account' })}
+                  title={user.full_name}
+                >
+                  <img src={user.avatar_url || FALLBACK_THUMB} alt="" />
                 </div>
               </div>
             ) : (
-              <button className="sign-in-btn-sm" onClick={() => setView({ name: 'account' })}>Sign In</button>
+              <button 
+                className="action-btn" 
+                onClick={() => setView({ name: 'account' })}
+              >
+                Sign In
+              </button>
             )}
           </div>
         </header>
@@ -1490,7 +1499,34 @@ function App() {
                         </div>
 
                         <div className="acc-card-v3">
-                          <h3>Gift Codes</h3>
+                          <h3>Account Security</h3>
+                          <p className="subtext">Set or update your login password.</p>
+                          <form 
+                            className="acc-claim-row-v3"
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              const newPass = (e.target as any).newPassword.value;
+                              if (!newPass) return;
+                              const { error } = await supabase.auth.updateUser({ password: newPass });
+                              if (error) alert(error.message);
+                              else {
+                                alert("Password updated successfully!");
+                                (e.target as any).reset();
+                              }
+                            }}
+                          >
+                            <input
+                              type="password"
+                              name="newPassword"
+                              placeholder="New password"
+                              required
+                            />
+                            <button type="submit">Update</button>
+                          </form>
+                        </div>
+
+                        <div className="acc-card-v3">
+                          <h3>Gift codes</h3>
                           <p className="subtext">Have a code? Claim it to activate features.</p>
                           <div className="claim-row-v3">
                             <input

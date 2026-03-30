@@ -1511,145 +1511,181 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #030303;
-  padding: 16px;
+  background: radial-gradient(circle at top right, #1a1a2e, #030303);
+  padding: 20px;
 }
 
-.google-auth-card {
-  background: #fff;
-  color: #202124;
-  width: 100%;
-  max-width: 450px;
-  min-height: 500px;
-  padding: 48px 40px 36px;
-  border-radius: 8px;
-  border: 1px solid #dadce0;
+/* ── Form Redesign ── */
+.auth-divider-v2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.auth-divider-v2::before, .auth-divider-v2::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.email-options-v2 {
   display: flex;
   flex-direction: column;
+  gap: 12px;
 }
 
-.google-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.google-brand {
-  font-family: inherit;
-  font-size: 24px;
-  font-weight: 500;
-  margin-bottom: 8px;
-  letter-spacing: -0.5px;
-}
-
-.google-header h1 {
-  font-size: 24px;
-  font-weight: 400;
-  margin-bottom: 8px;
-  color: #202124;
-}
-
-.google-header p {
-  font-size: 16px;
-  color: #202124;
-  margin-bottom: 32px;
-}
-
-.google-signin-btn {
+.email-action-btn {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #dadce0;
-  background: #fff;
-  color: #3c4043;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   cursor: pointer;
-  transition: background 0.2s;
-  margin-bottom: 16px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.google-signin-btn:hover {
-  background: #f8f9fa;
+.email-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
 }
 
-.google-signin-btn img {
-  width: 18px;
-  height: 18px;
+.email-action-btn.signup {
+  background: #fff;
+  color: #000;
+  border: none;
 }
 
-.auth-divider {
-  display: flex;
-  align-items: center;
-  margin: 16px 0;
-  color: #5f6368;
-  font-size: 12px;
+.email-action-btn.signup:hover {
+  background: #e0e0e0;
 }
 
-.auth-divider::before,
-.auth-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #dadce0;
-  margin: 0 10px;
-}
-
-.google-form {
+.auth-form-v2 {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  flex: 1;
+  text-align: left;
 }
 
-.google-form input {
-  width: 100%;
-  padding: 13px 15px;
-  font-size: 16px;
-  border: 1px solid #dadce0;
-  border-radius: 4px;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.google-form input:focus {
-  border-color: #1a73e8;
-  border-width: 2px;
-}
-
-.form-actions {
-  margin-top: auto;
-  padding-top: 24px;
+.input-group-v2 {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
 }
 
-.toggle-auth {
+.input-group-v2 .input-icon {
+  position: absolute;
+  left: 16px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.input-group-v2 input {
+  width: 100%;
+  padding: 14px 16px 14px 48px !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  color: #fff !important;
+  font-size: 15px !important;
+  margin-bottom: 0 !important;
+  transition: all 0.2s;
+}
+
+.input-group-v2 input:focus {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: #fff !important;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+}
+
+.submit-auth-btn {
+  width: 100%;
+  padding: 14px;
+  background: #fff;
+  color: #000;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.submit-auth-btn:hover {
+  background: #e0e0e0;
+  transform: translateY(-2px);
+}
+
+.auth-error-v2 {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 59, 48, 0.2);
+}
+
+.form-toggle-v2 {
+  text-align: center;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 16px;
+}
+
+.form-toggle-v2 button {
   background: none;
   border: none;
-  color: #1a73e8;
-  font-weight: 500;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.blue-btn {
-  background: #1a73e8;
   color: #fff;
-  border: none;
-  padding: 10px 24px;
-  border-radius: 4px;
-  font-weight: 500;
-  font-size: 14px;
+  font-weight: 700;
+  margin-left: 6px;
   cursor: pointer;
+  text-decoration: underline;
 }
 
-.blue-btn:hover {
-  background: #1b66c9;
+.back-btn-v2 {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+@media (max-width: 480px) {
+  .back-btn-v2 {
+    top: 20px;
+    left: 20px;
+  }
+}
+
+.back-btn-v2:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(-4px);
 }
 
 
@@ -2954,14 +2990,74 @@ body {
   opacity: 0.9;
 }
 
-.upgrad-banner button {
+.claim-row-v3,
+.acc-claim-row-v3 {
+  display: flex;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s;
+}
+
+.acc-claim-row-v3:focus-within {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.claim-row-v3 input,
+.acc-claim-row-v3 input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #fff;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+}
+
+.claim-row-v3 button,
+.acc-claim-row-v3 button {
   background: #fff;
   color: #000;
   border: none;
-  padding: 8px;
-  border-radius: 8px;
+  padding: 8px 24px;
+  border-radius: 10px;
   font-weight: 700;
+  font-size: 13px;
   cursor: pointer;
+  transition: all 0.2s;
+}
+
+.claim-row-v3 button:hover,
+.acc-claim-row-v3 button:hover {
+  background: #e0e0e0;
+  transform: translateY(-1px);
+}
+
+.acc-actions-footer {
+  margin-top: 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 40px;
+  text-align: center;
+}
+
+.logout-btn-v3 {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+  border: 1px solid rgba(255, 59, 48, 0.2);
+  padding: 14px 48px;
+  border-radius: 100px;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-btn-v3:hover {
+  background: rgba(255, 59, 48, 0.2);
+  transform: scale(1.05);
 }
 
 .primary-acc-btn {
