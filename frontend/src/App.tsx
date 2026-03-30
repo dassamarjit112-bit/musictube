@@ -194,20 +194,17 @@ function App() {
   const ytPlayer = useYouTubePlayer("yt-player-container", {
     onStateChange: (state) => {
       // YT.PlayerState: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering, 5=cued
-      if (state === 1) {
+      if (state === 1 || state === 3) {
         setIsPlaying(true);
         setPlayerError(null);
-      } else if (state === 2) {
+      } else if (state === 2 || state === 0) {
         setIsPlaying(false);
-      } else if (state === 0) {
-        // Track ended
-        setIsPlaying(false);
-        handleNextRef.current();
+        if (state === 0) handleNextRef.current();
       } else if ((state === -1 || state === 5) && isPlayingRef.current) {
-        // Auto-play bridging for stuck states (avoiding state 3 / buffering loop)
+        // Stuck state bridging
         setTimeout(() => {
           if (isPlayingRef.current) ytPlayer.play();
-        }, 500);
+        }, 800);
       }
     },
     onProgress: (p, secs) => {
@@ -1449,7 +1446,7 @@ function App() {
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button onClick={handlePrev} className="float-btn"><SkipBack size={32} fill="currentColor" /></button>
-                              <button className="float-play-circle" onClick={() => setIsPlaying(!isPlaying)}>
+                              <button className="float-play-circle" onClick={() => setIsPlaying(p => !p)}>
                                 {isPlaying ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" style={{ marginLeft: 6 }} />}
                               </button>
                               <button onClick={handleNext} className="float-btn"><SkipForward size={32} fill="currentColor" /></button>
@@ -1519,7 +1516,7 @@ function App() {
                       </div>
                       <div className="ctrl-btns-v4">
                         <button onClick={handlePrev} className="ctrl-side-btn"><SkipBack size={28} fill="currentColor" /></button>
-                        <button className="play-pill-btn" onClick={() => setIsPlaying(!isPlaying)}>
+                        <button className="play-pill-btn" onClick={() => setIsPlaying(p => !p)}>
                           {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" style={{ marginLeft: 4 }} />}
                         </button>
                         <button onClick={handleNext} className="ctrl-side-btn"><SkipForward size={28} fill="currentColor" /></button>
@@ -1759,7 +1756,7 @@ function App() {
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!currentSong) return;
-                  setIsPlaying(!isPlaying);
+                  setIsPlaying(p => !p);
                 }}
               >
                 {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" />}
