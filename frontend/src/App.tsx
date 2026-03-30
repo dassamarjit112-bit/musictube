@@ -231,12 +231,12 @@ function App() {
         try {
           // Search for a playable alternative (e.g., topic video or audio-only)
           const query = `${currentSong?.title} ${currentSong?.artist} audio`;
-          const { data: results } = await axios.get(`${BACKEND_URL}/api/search?q=${encodeURIComponent(query)}`);
-          const choice = results.find((i: any) => i.videoId !== currentSong?.videoId);
+          const { results } = await api.search(query);
+          const choice = (results || []).find((i: any) => i.videoId !== currentSong?.videoId && (i.type === "song" || i.type === "video"));
           if (choice) {
             setTimeout(() => {
               setPlayerError(null);
-              playSong(choice);
+              playSong(choice as Song);
             }, 1000);
             return;
           }
@@ -397,14 +397,13 @@ function App() {
           badge: '/logo.png',
           tag: 'musictube-player',
           silent: true, // Don't beep on every state change!
-          renotify: false,
           requireInteraction: true, // Keep it visible!
           data: { videoId: currentSong.videoId },
           actions: [
             { action: isPlaying ? 'pause' : 'play', title: isPlaying ? 'Pause' : 'Play' },
             { action: 'next', title: 'Next' }
           ]
-        });
+        } as any);
       }
     };
 
