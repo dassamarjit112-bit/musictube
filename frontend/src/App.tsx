@@ -95,6 +95,12 @@ function App() {
     const hOffline = () => setIsOffline(true);
     window.addEventListener('online', hOnline);
     window.addEventListener('offline', hOffline);
+
+    // Request Notification permission at first visit
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
     return () => {
       window.removeEventListener('online', hOnline);
       window.removeEventListener('offline', hOffline);
@@ -217,8 +223,28 @@ function App() {
     },
     onDuration: (d) => setDuration(d),
     // Removed onEnded here because it's handled in onStateChange above to avoid double calls
-    onError: (code) => {
+    onError: async (code) => {
       console.error("YouTube player error code:", code);
+      // Support for restricted content (Error 150/101)
+      if (code === 150 || code === 101) {
+        setPlayerError("Content restricted. Finding alternative...");
+        try {
+          // Search for a playable alternative (e.g., topic video or audio-only)
+          const query = `${currentSong?.title} ${currentSong?.artist} audio`;
+          const { data: results } = await axios.get(`${BACKEND_URL}/api/search?q=${encodeURIComponent(query)}`);
+          const choice = results.find((i: any) => i.videoId !== currentSong?.videoId);
+          if (choice) {
+            setTimeout(() => {
+              setPlayerError(null);
+              playSong(choice);
+            }, 1000);
+            return;
+          }
+        } catch (e) {
+          console.error("Alternative search failed", e);
+        }
+      }
+
       const msg =
         code === 150 || code === 101
           ? "This video is restricted from being embedded."
@@ -284,10 +310,11 @@ function App() {
 
 
 
-  // ─── Media Session & Notifications ───
+  // ─── Media Session Metadata & State (Frequent Updates) ───
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentSong) return;
     
+    // Update simple metadata
     navigator.mediaSession.metadata = new window.MediaMetadata({
       title: currentSong.title,
       artist: currentSong.artist || "MusicTube",
@@ -303,27 +330,38 @@ function App() {
     });
 
     // Update position state for lockscreen progress
-    if (duration > 0) {
+    if (duration > 0 && isFinite(playedSeconds)) {
       try {
         navigator.mediaSession.setPositionState({
           duration: duration,
           playbackRate: 1.0,
-          position: Math.min(playedSeconds, duration),
+          position: Math.max(0, Math.min(playedSeconds, duration)),
         });
       } catch (e) { console.warn("MediaSession position update failed", e); }
     }
 
-    navigator.mediaSession.setActionHandler("play", () => setIsPlaying(true));
-    navigator.mediaSession.setActionHandler("pause", () => setIsPlaying(false));
-    navigator.mediaSession.setActionHandler("previoustrack", () => handlePrev());
-    navigator.mediaSession.setActionHandler("nexttrack", () => handleNext());
-    navigator.mediaSession.setActionHandler("seekbackward", () => {
-      ytPlayer.seekTo(Math.max(0, (playedSeconds - 10) / duration));
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [currentSong, isPlaying, duration, playedSeconds]);
+
+  // ─── Media Session Handlers (Stable) ───
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+
+    const nav = navigator.mediaSession;
+    nav.setActionHandler("play", () => setIsPlaying(true));
+    nav.setActionHandler("pause", () => setIsPlaying(false));
+    nav.setActionHandler("previoustrack", () => handlePrev());
+    nav.setActionHandler("nexttrack", () => handleNext());
+    
+    nav.setActionHandler("seekbackward", (details) => {
+      const skipTime = details.seekOffset || 10;
+      ytPlayer.seekTo(Math.max(0, (playedSeconds - skipTime) / duration));
     });
-    navigator.mediaSession.setActionHandler("seekforward", () => {
-      ytPlayer.seekTo(Math.min(0.99, (playedSeconds + 10) / duration));
+    nav.setActionHandler("seekforward", (details) => {
+      const skipTime = details.seekOffset || 10;
+      ytPlayer.seekTo(Math.min(0.99, (playedSeconds + skipTime) / duration));
     });
-    navigator.mediaSession.setActionHandler('seekto', (details) => {
+    nav.setActionHandler('seekto', (details) => {
       if (details.seekTime !== undefined && duration > 0) {
         const newPos = details.seekTime / duration;
         setPlayed(newPos);
@@ -331,8 +369,50 @@ function App() {
       }
     });
 
-    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-  }, [currentSong, isPlaying, duration, playedSeconds, ytPlayer]);
+    return () => {
+      // Cleanup handlers to prevent memory leaks or ghost controls
+      [ "play", "pause", "previoustrack", "nexttrack", "seekbackward", "seekforward", "seekto"].forEach(
+        (action: any) => nav.setActionHandler(action, null)
+      );
+    }
+  }, [ytPlayer, duration, playedSeconds]); // Still need some deps but less frequent than re-running metadata logic
+
+
+  // ─── Persistent System Notification (Secondary Controls) ───
+  useEffect(() => {
+    if (!("Notification" in window) || Notification.permission !== "granted" || !currentSong) return;
+    
+    const showSongNotification = async () => {
+      const reg = await navigator.serviceWorker.ready;
+      if (!reg) return;
+
+      // Close previous to avoid stacking
+      const notes = await reg.getNotifications({ tag: 'musictube-player' });
+      notes.forEach(n => n.close());
+
+      if (isPlaying) {
+        reg.showNotification(currentSong.title, {
+          body: `${currentSong.artist} • ${currentSong.album || 'Now Playing'}`,
+          icon: currentSong.thumbnail,
+          badge: '/logo.png',
+          tag: 'musictube-player',
+          silent: true, // Don't beep on every state change!
+          renotify: false,
+          requireInteraction: true, // Keep it visible!
+          data: { videoId: currentSong.videoId },
+          actions: [
+            { action: isPlaying ? 'pause' : 'play', title: isPlaying ? 'Pause' : 'Play' },
+            { action: 'next', title: 'Next' }
+          ]
+        });
+      }
+    };
+
+    showSongNotification();
+  }, [currentSong?.videoId, isPlaying]); // Update when song or play state changes
+
+  // Listener for actions in sw.js would be needed for buttons to work, 
+  // but most users will use the standard Media Session controls in the tray.
 
   // App Session Listener
   useEffect(() => {
@@ -1873,17 +1953,6 @@ function App() {
           />
         )}
       </AnimatePresence>
-
-      <SubscriptionModal
-        user={user}
-        isOpen={showSubscriptionModal}
-        onClose={() => {
-          setShowSubscriptionModal(false);
-          setGiftCodeToClaim('');
-        }}
-        onRefreshUser={(u) => setUser(u)}
-        initialGiftCode={giftCodeToClaim}
-      />
     </div>
   );
 }
