@@ -7,11 +7,11 @@ interface AuthProps {
   onLogin: (user: any) => void;
 }
 
-type AuthMode = 'initial' | 'email-login' | 'email-signup';
+type AuthPage = 'landing' | 'login' | 'register' | 'complete-profile';
 
 export function Auth({ onLogin }: AuthProps) {
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<AuthMode>('initial');
+  const [activePage, setActivePage] = useState<AuthPage>('landing');
   
   // Form State
   const [email, setEmail] = useState('');
@@ -19,59 +19,40 @@ export function Auth({ onLogin }: AuthProps) {
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const [isFlutterApp, setIsFlutterApp] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-
   useEffect(() => {
-    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-    const isWebView =
-      (/flutter/i.test(userAgent) || (window as any).flutter_inappwebview !== undefined) &&
-      window.location.port !== '8080';
-
-    setIsFlutterApp(isWebView);
-    if (isWebView) setIsSyncing(true);
-
-    const handleNativeLogin = async (nativeUserData: any) => {
-      setLoading(true);
-      setIsSyncing(false);
-      try {
-        const userToSync = {
-          id: nativeUserData.id || nativeUserData.sub,
-          email: nativeUserData.email,
-          full_name: nativeUserData.name || nativeUserData.full_name || 'User',
-          avatar_url: nativeUserData.picture || nativeUserData.avatar_url || '',
-        };
-
-        const { error: upsertError } = await supabase.from('profiles').upsert(userToSync);
-        if (upsertError) console.error("Native Profile sync error:", upsertError.message);
-
-        localStorage.setItem('ytm_user', JSON.stringify(userToSync));
-        onLogin(userToSync);
-      } catch (err) {
-        console.error("Flutter App Sync failed:", err);
-      } finally {
-        setLoading(false);
+    // Check if we just returned from OAuth and need to complete profile
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // If it's a social login, check if profile is complete (mock check)
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        
+        // If no profile or missing fullName, assume we need setup (common for new OAuth)
+        if (!profile || !profile.full_name) {
+          setActivePage('complete-profile');
+        } else {
+          onLogin({
+            id: session.user.id,
+            email: session.user.email,
+            full_name: profile.full_name,
+            avatar_url: profile.avatar_url || '',
+            subscription_tier: profile.subscription_tier || 'free'
+          });
+        }
       }
     };
-
-    (window as any).onNativeLoginSuccess = handleNativeLogin;
-
-    return () => {
-      delete (window as any).onNativeLoginSuccess;
-    };
+    
+    checkSession();
   }, [onLogin]);
 
-  const handleSupabaseGoogleLogin = async () => {
+  const handleOAuth = async (provider: 'google' | 'github') => {
     setLoading(true);
     setError(null);
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider,
       options: { redirectTo: window.location.origin }
     });
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    }
+    if (error) { setError(error.message); setLoading(false); }
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -80,215 +61,155 @@ export function Auth({ onLogin }: AuthProps) {
     setError(null);
 
     try {
-      if (mode === 'email-signup') {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName }
-          }
-        });
-
-        if (error) throw error;
+      if (activePage === 'register' || activePage === 'complete-profile') {
+        let authResult;
+        if (activePage === 'register') {
+          authResult = await supabase.auth.signUp({
+            email, password, options: { data: { full_name: fullName } }
+          });
+          if (authResult.error) throw authResult.error;
+        } else {
+          // Setting password for existing account (OAuth complete profile)
+          const { error } = await supabase.auth.updateUser({ password, data: { full_name: fullName } });
+          if (error) throw error;
+          const { data: { user } } = await supabase.auth.getUser();
+          authResult = { data: { user } };
+        }
         
-        if (data.user) {
-          const newUser = {
-            id: data.user.id,
-            email: data.user.email,
-            full_name: fullName || 'New User',
-            avatar_url: '',
+        if (authResult.data.user) {
+          const u = authResult.data.user;
+          const userObj = {
+            id: u.id,
+            email: u.email,
+            full_name: fullName || u.user_metadata?.full_name || 'User',
+            avatar_url: u.user_metadata?.avatar_url || '',
             subscription_tier: 'free'
           };
-          localStorage.setItem('ytm_user', JSON.stringify(newUser));
-          onLogin(newUser);
+          localStorage.setItem('ytm_user', JSON.stringify(userObj));
+          onLogin(userObj);
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-
         if (data.user) {
-          // Fetch profile details
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-
-          const existingUser = {
+          const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
+          const userObj = {
             id: data.user.id,
             email: data.user.email,
             full_name: profile?.full_name || 'User',
             avatar_url: profile?.avatar_url || '',
             subscription_tier: profile?.subscription_tier || 'free'
           };
-          localStorage.setItem('ytm_user', JSON.stringify(existingUser));
-          onLogin(existingUser);
+          localStorage.setItem('ytm_user', JSON.stringify(userObj));
+          onLogin(userObj);
         }
       }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message); }
+    finally { setLoading(false); }
   };
 
-  if (isFlutterApp && isSyncing) {
-    return (
-      <div className="app-loader-container">
-        <div className="mini-loader" />
-        <p>Syncing your profile...</p>
-        <button className="bypass-btn" onClick={() => setIsSyncing(false)}>Skip Sync</button>
+  const renderLanding = () => (
+    <motion.div key="landing" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="auth-step-container">
+      <div className="auth-hero-section">
+        <Headphones size={48} className="hero-icon" />
+        <h2>Your Music, Anywhere.</h2>
+        <p>Premium streaming experience for the true music enthusiast.</p>
       </div>
-    );
-  }
+      
+      <div className="social-login-grid">
+        <button onClick={() => handleOAuth('google')} className="social-pill-btn google">
+          <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" alt="G" />
+          Continue with Google
+        </button>
+      </div>
+
+      <div className="auth-divider-v2"><span>OR USE EMAIL</span></div>
+
+      <div className="landing-actions">
+        <button className="primary-glass-btn" onClick={() => setActivePage('login')}>
+          <LogIn size={20} /> Sign In
+        </button>
+        <button className="secondary-glass-btn" onClick={() => setActivePage('register')}>
+          <UserPlus size={20} /> Create Account
+        </button>
+      </div>
+    </motion.div>
+  );
+
+  const renderForm = (type: 'login' | 'register' | 'complete-profile') => (
+    <motion.form key={type} initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="auth-standalone-form" onSubmit={handleEmailAuth}>
+      <header className="form-head">
+        <button type="button" className="mini-back" onClick={() => setActivePage('landing')}><ChevronLeft size={20} /></button>
+        <h3>{type === 'login' ? 'Sign In' : type === 'register' ? 'Join MusicTube' : 'Finalize Profile'}</h3>
+        <p>{type === 'complete-profile' ? 'Please set a password and name for your account.' : 'Enter your details below to continue.'}</p>
+      </header>
+
+      {(type === 'register' || type === 'complete-profile') && (
+        <div className="modern-input-group">
+          <label>Full Name</label>
+          <div className="input-field-v2">
+            <User size={18} />
+            <input type="text" placeholder="John Doe" value={fullName} onChange={e => setFullName(e.target.value)} required />
+          </div>
+        </div>
+      )}
+
+      {type !== 'complete-profile' && (
+        <div className="modern-input-group">
+          <label>Email Address</label>
+          <div className="input-field-v2">
+            <AtSign size={18} />
+            <input type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
+          </div>
+        </div>
+      )}
+
+      <div className="modern-input-group">
+        <label>Password</label>
+        <div className="input-field-v2">
+          <Lock size={18} />
+          <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+        </div>
+      </div>
+
+      {error && <div className="modern-auth-error">{error}</div>}
+
+      <button type="submit" disabled={loading} className="giant-gradient-btn">
+        {loading ? <div className="mini-loader" /> : (
+          <>{type === 'login' ? 'Sign In' : (type === 'register' ? 'Create Account' : 'Complete Setup')} <ArrowRight size={20} /></>
+        )}
+      </button>
+
+      {type !== 'complete-profile' && (
+        <p className="form-footer-switch">
+          {type === 'login' ? "Don't have an account?" : "Already have an account?"}
+          <span onClick={() => setActivePage(type === 'login' ? 'register' : 'login')}>
+            {type === 'login' ? ' Register Now' : ' Login Instead'}
+          </span>
+        </p>
+      )}
+    </motion.form>
+  );
 
   return (
-    <div className="auth-container-v2">
-      <div className="auth-bg-overlay" />
-      
-      <motion.div
-        className="auth-card-v2"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <div className="auth-header-v2">
-          {mode !== 'initial' && (
-            <button className="back-btn-v2" onClick={() => { setMode('initial'); setError(null); }}>
-              <ChevronLeft size={20} />
-            </button>
-          )}
-          <div className="auth-logo-v2">
-            <img src="/logo.png" alt="MusicTube" className="auth-logo-img" />
-            <h1 className="auth-title-v2">MusicTube</h1>
+    <div className="auth-overlay-premium">
+      <div className="auth-background-canvas" />
+      <div className="auth-scroll-container">
+        <div className="auth-inner-card">
+          <div className="auth-branding-v4">
+            <img src="/logo.png" alt="MusicTube" />
+            <h1>MusicTube</h1>
           </div>
-          <p className="auth-subtitle-v2">
-            {mode === 'email-signup' ? 'Create your account' : mode === 'email-login' ? 'Welcome back' : 'Connect your music universe'}
-          </p>
-        </div>
-
-        <div className="auth-content-v2">
+          
           <AnimatePresence mode="wait">
-            {mode === 'initial' ? (
-              <motion.div 
-                key="initial"
-                initial={{ opacity: 0, x: -10 }} 
-                animate={{ opacity: 1, x: 0 }} 
-                exit={{ opacity: 0, x: 10 }}
-                className="auth-options-v2"
-              >
-                <button
-                  onClick={handleSupabaseGoogleLogin}
-                  disabled={loading}
-                  className="google-btn-premium"
-                >
-                  {loading ? <div className="mini-loader" /> : (
-                    <>
-                      <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" className="google-icon-v2" alt="Google" />
-                      Continue with Google
-                    </>
-                  )}
-                </button>
-
-                <div className="auth-divider-v2">
-                  <span>OR</span>
-                </div>
-
-                <div className="email-options-v2">
-                  <button className="email-action-btn" onClick={() => setMode('email-login')}>
-                    <LogIn size={18} />
-                    Login with Email
-                  </button>
-                  <button className="email-action-btn signup" onClick={() => setMode('email-signup')}>
-                    <UserPlus size={18} />
-                    Create New Account
-                  </button>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.form 
-                key="form"
-                initial={{ opacity: 0, x: 10 }} 
-                animate={{ opacity: 1, x: 0 }} 
-                exit={{ opacity: 0, x: -10 }}
-                className="auth-form-v2"
-                onSubmit={handleEmailAuth}
-              >
-                {mode === 'email-signup' && (
-                  <div className="input-group-v2">
-                    <User size={18} className="input-icon" />
-                    <input 
-                      type="text" 
-                      placeholder="Full Name" 
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required 
-                    />
-                  </div>
-                )}
-                
-                <div className="input-group-v2">
-                  <AtSign size={18} className="input-icon" />
-                  <input 
-                    type="email" 
-                    placeholder="Email Address" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required 
-                  />
-                </div>
-
-                <div className="input-group-v2">
-                  <Lock size={18} className="input-icon" />
-                  <input 
-                    type="password" 
-                    placeholder="Password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required 
-                  />
-                </div>
-
-                {error && <div className="auth-error-v2">{error}</div>}
-
-                <button type="submit" disabled={loading} className="submit-auth-btn">
-                  {loading ? <div className="mini-loader" /> : (
-                    <>
-                      {mode === 'email-signup' ? 'Create Account' : 'Sign In'}
-                      <ArrowRight size={18} />
-                    </>
-                  )}
-                </button>
-
-                <p className="form-toggle-v2">
-                  {mode === 'email-signup' ? 'Already have an account?' : "Don't have an account?"}
-                  <button type="button" onClick={() => setMode(mode === 'email-signup' ? 'email-login' : 'email-signup')}>
-                    {mode === 'email-signup' ? 'Login' : 'Sign Up'}
-                  </button>
-                </p>
-              </motion.form>
-            )}
+            {activePage === 'landing' ? renderLanding() : renderForm(activePage)}
           </AnimatePresence>
 
-          <div className="auth-benefits-v2">
-            <div className="benefit-item-v2">
-              <Headphones size={20} className="benefit-icon-v2" />
-              <span>Listen and discover music you love.</span>
-            </div>
-            <div className="benefit-item-v2">
-              <ShieldCheck size={20} className="benefit-icon-v2" />
-              <span>Safe and secure authentication.</span>
-            </div>
-          </div>
+          <footer className="auth-security-footer">
+            <ShieldCheck size={14} /> End-to-end secure authentication powered by Supabase
+          </footer>
         </div>
-
-        <div className="auth-footer-v2">
-          <p>By continuing, you agree to our Terms and Conditions.</p>
-          <div className="secure-badge-v2">
-            <ShieldCheck size={12} /> Secure Account
-          </div>
-        </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
