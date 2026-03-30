@@ -313,16 +313,73 @@ def playlist(playlist_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ─── WATCH ────────────────────────────────────────────────────────
+# ─── WATCH (Smart Queue Builder) ────────────────────────────────────────────
 
 @app.route("/api/watch/<video_id>")
 def watch(video_id):
     try:
-        data = yt.get_watch_playlist(videoId=video_id, limit=20)
-        tracks = [fmt_song(t) for t in data.get("tracks", [])]
-        return jsonify({"tracks": tracks})
+        seen_ids = set()
+        all_tracks = []
+
+        def add_unique(tracks_list):
+            """Add tracks to the queue, skipping duplicates."""
+            for t in tracks_list:
+                vid = t.get("videoId", "")
+                if vid and vid not in seen_ids:
+                    seen_ids.add(vid)
+                    all_tracks.append(fmt_song(t))
+
+        # 1. Primary: Get watch playlist (YouTube's own "Up Next" queue)
+        try:
+            data = yt.get_watch_playlist(videoId=video_id, limit=50)
+            add_unique(data.get("tracks", []))
+        except:
+            pass
+
+        # 2. Get song info to extract artist and title for smarter searches
+        song_artist = ""
+        song_title = ""
+        if all_tracks:
+            song_artist = all_tracks[0].get("artist", "")
+            song_title = all_tracks[0].get("title", "")
+
+        # 3. Secondary: Search for more songs by the same artist
+        if song_artist and song_artist != "Unknown Artist":
+            try:
+                artist_results = yt.search(song_artist, filter="songs", limit=15)
+                add_unique([r for r in artist_results if r.get("resultType") == "song"])
+            except:
+                pass
+
+        # 4. Tertiary: Search by song title keywords to find language-similar songs
+        # This is key for Hindi/regional language matching
+        if song_title:
+            # Extract meaningful keywords (skip very short words)
+            keywords = [w for w in song_title.split() if len(w) > 2]
+            # Use first 2-3 keywords for a targeted search
+            search_query = " ".join(keywords[:3]) if keywords else song_title
+            try:
+                title_results = yt.search(search_query, filter="songs", limit=15)
+                add_unique([r for r in title_results if r.get("resultType") == "song"])
+            except:
+                pass
+
+        # 5. If still low on tracks, try a Radio mix via get_watch_playlist with radio=True
+        if len(all_tracks) < 30:
+            try:
+                radio_data = yt.get_watch_playlist(videoId=video_id, limit=50, radio=True)
+                add_unique(radio_data.get("tracks", []))
+            except:
+                pass
+
+        # 6. Filter out the current song from the queue
+        final_tracks = [t for t in all_tracks if t.get("videoId") != video_id]
+
+        return jsonify({"tracks": final_tracks})
     except Exception as e:
+        print(f"Watch/queue error: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 # ─── EXPLORE ───────────────────────────────────────────────────────────────────
 

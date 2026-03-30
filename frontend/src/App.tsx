@@ -236,41 +236,52 @@ function App() {
     }
   };
 
-  const triggerAutoPlayExtension = async (lastSong: Song) => {
+  const triggerAutoPlayExtension = async (seedSong: Song) => {
     try {
-      // 1. Fetch initial related tracks
-      const res = await api.watch(lastSong.videoId);
+      // 1. Fetch smart queue from backend (includes artist + language-similar tracks)
+      const res = await api.watch(seedSong.videoId);
       let tracks = res.tracks || [];
 
-      // 2. Filter out already queued to avoid infinite loops
+      // 2. Filter out already queued songs
       const currentIds = new Set(queueRef.current.map(s => s.videoId));
       let filteredTracks = tracks.filter(t => !currentIds.has(t.videoId));
 
-      // 3. If we don't have enough (40+), fetch recommendations for the FIRST related track too!
-      // This deepens the vibe search (recursive-style extension)
-      if (filteredTracks.length < 40 && tracks.length > 0) {
-        const secondaryRes = await api.watch(tracks[0].videoId);
-        const secondaryTracks = secondaryRes.tracks || [];
-        const secondaryFiltered = secondaryTracks.filter(t => !currentIds.has(t.videoId) && !tracks.some(tr => tr.videoId === t.videoId));
-        filteredTracks = [...filteredTracks, ...secondaryFiltered];
+      // 3. Shuffle slightly for variety on every refresh/play (keeps first 5 stable)
+      if (filteredTracks.length > 5) {
+        const top = filteredTracks.slice(0, 5);
+        const rest = filteredTracks.slice(5);
+        for (let i = rest.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [rest[i], rest[j]] = [rest[j], rest[i]];
+        }
+        filteredTracks = [...top, ...rest];
       }
 
-      const nextBatch = filteredTracks.slice(0, 50); // Get up to 50 for a solid queue
+      // 4. Deep fetch if queue is still small
+      if (filteredTracks.length < 25 && tracks.length > 2) {
+        const deepSeed = tracks[Math.floor(Math.random() * Math.min(5, tracks.length))];
+        try {
+          const deepRes = await api.watch(deepSeed.videoId);
+          const deepTracks = (deepRes.tracks || []).filter(
+            t => !currentIds.has(t.videoId) && !filteredTracks.some(f => f.videoId === t.videoId)
+          );
+          filteredTracks = [...filteredTracks, ...deepTracks];
+        } catch { /* ignore secondary fetch failure */ }
+      }
 
+      const nextBatch = filteredTracks.slice(0, 60);
       setQueue(prev => [...prev, ...nextBatch]);
 
-      // 4. Start playback if stopped
-      if (!isPlayingRef.current) {
-        const firstNewSong = nextBatch[0];
-        if (firstNewSong) {
-          setCurrentSong(firstNewSong);
-          setIsPlaying(true);
-        }
+      // 5. Start playback if stopped
+      if (!isPlayingRef.current && nextBatch.length > 0) {
+        setCurrentSong(nextBatch[0]);
+        setIsPlaying(true);
       }
     } catch (e) {
       console.error("Auto-play extension failed:", e);
     }
   };
+
 
   const playSong = async (song: Song, songList?: Song[]) => {
     if (!song.videoId) return;
@@ -307,14 +318,18 @@ function App() {
     }
     silentRef.current.play().catch(() => { });
 
-    // ─── Auto-populate Vibe-Matched Queue ───
-    if (!songList || songList.length < 5) {
-      triggerAutoPlayExtension(song);
-    } else {
+    // ─── Smart Queue Building ───
+    if (songList && songList.length >= 5) {
+      // Use the provided list as the base queue
       setQueue(songList);
-      if (songList.length < 20) {
-        triggerAutoPlayExtension(songList[songList.length - 1]);
+      // If the list is small, extend it with related tracks
+      if (songList.length < 30) {
+        triggerAutoPlayExtension(song);
       }
+    } else {
+      // No list or very small — build a fresh smart queue from this song
+      setQueue([song]);
+      triggerAutoPlayExtension(song);
     }
   };
 
