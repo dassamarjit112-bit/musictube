@@ -21,13 +21,15 @@ def limit_items(items: Any, limit: int = 12) -> List[Any]:
 # Initialize YTMusic
 # In Vercel, put your headers.json or oauth_token.json in the 'api' directory if needed,
 # or better yet, use environment variables.
-headers_file = os.path.join(os.path.dirname(__file__), 'headers.json')
-if os.path.exists(headers_file):
-    yt = YTMusic(headers_file)
-else:
-    # If no headers, try using an environment variable for auth if you have it
-    # For now, fallback to unauthenticated
+try:
+    if os.path.exists(headers_file):
+        yt = YTMusic(headers_file)
+    else:
+        yt = YTMusic()
+except Exception as e:
+    print(f"YTMusic init error on Vercel: {e}")
     yt = YTMusic()
+
 
 def safe_thumb(thumbs):
     """Pick the best thumbnail from a list and normalize resolution."""

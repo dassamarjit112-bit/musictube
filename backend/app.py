@@ -2,7 +2,9 @@ import sys
 import os
 
 # Add ytmusicapi to path if folder exists in parent
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ytmusicapi'))
+# Using system-installed ytmusicapi package (1.11.5)
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ytmusicapi'))
+
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -24,13 +26,17 @@ def limit_items(items: Any, limit: int = 12) -> List[Any]:
 
 # Initialize YTMusic
 # Using authenticated headers.json if it exists for better home feed results
-headers_file = os.path.join(os.path.dirname(__file__), 'headers.json')
-if os.path.exists(headers_file):
-    yt = YTMusic(headers_file)
-    print("YTMusic initialized with headers.json")
-else:
+try:
+    if os.path.exists(headers_file):
+        yt = YTMusic(headers_file)
+        print("YTMusic initialized with headers.json")
+    else:
+        yt = YTMusic()
+        print("YTMusic initialized without authentication")
+except Exception as e:
+    print(f"YTMusic init error with headers: {e}. Falling back to unauthenticated.")
     yt = YTMusic()
-    print("YTMusic initialized without authentication")
+
 
 def safe_thumb(thumbs):
     """Pick the best thumbnail from a list."""
