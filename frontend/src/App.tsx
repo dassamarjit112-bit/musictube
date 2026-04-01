@@ -243,10 +243,15 @@ function App() {
 
   const staticCurrentSongId = useRef<string | null>(null);
   const handleNextRef = useRef<() => void>(() => { });
+  const handlePrevRef = useRef<() => void>(() => { });
+  const ytPlayRef = useRef<() => void>(() => { });
+  const ytPauseRef = useRef<() => void>(() => { });
+  const setIsPlayingRef = useRef<any>(null);
   const repeatModeRef = useRef(repeatMode);
   const isShuffleRef = useRef(isShuffle);
   repeatModeRef.current = repeatMode;
   isShuffleRef.current = isShuffle;
+  setIsPlayingRef.current = setIsPlaying;
 
   const ytPlayer = useYouTubePlayer("yt-player-container", {
     onReady: () => setIsPlaying(p => p),
@@ -289,6 +294,9 @@ function App() {
       setTimeout(() => { setPlayerError(null); handleNextRef.current(); }, 1000);
     },
   });
+  ytPlayRef.current = ytPlayer.play;
+  ytPauseRef.current = ytPlayer.pause;
+
 
   const handleNext = useCallback(async () => {
     const q = queueRef.current;
@@ -383,6 +391,8 @@ function App() {
       ytPlayer.seekTo(0);
     }
   };
+  handlePrevRef.current = handlePrev;
+
 
   const triggerAutoPlayExtension = async (seedSong: Song) => {
     try {
@@ -557,35 +567,53 @@ function App() {
       notificationIcon: 'notification' 
     });
 
-    // Listen for clicks on the Notification buttons
-    MusicControls.addListener('controlsNotification', (action: any) => {
-      switch (action.message) {
-        case 'music-controls-next':
-          handleNext();
-          break;
-        case 'music-controls-previous':
-          handlePrev();
-          break;
-        case 'music-controls-pause':
-          ytPlayer.pause();
-          setIsPlaying(false);
-          break;
-        case 'music-controls-play':
-          ytPlayer.play();
-          setIsPlaying(true);
-          break;
-        case 'music-controls-destroy':
-          // Handle closing the app
-          break;
-        default:
-          break;
-      }
-    });
-
     // Update the play/pause state in the notification tray
     MusicControls.updateIsPlaying({ isPlaying: isPlaying });
-
   }, [currentSong, isPlaying]); 
+
+  // Global static native listeners
+  useEffect(() => {
+    let listener: any = null;
+
+    MusicControls.addListener('controlsNotification', (action: any) => {
+      if (!action || !action.message) return;
+      switch (action.message) {
+        case 'music-controls-next':
+          handleNextRef.current();
+          break;
+        case 'music-controls-previous':
+          handlePrevRef.current();
+          break;
+        case 'music-controls-pause':
+          ytPauseRef.current();
+          setIsPlayingRef.current(false);
+          break;
+        case 'music-controls-play':
+          ytPlayRef.current();
+          setIsPlayingRef.current(true);
+          break;
+        case 'music-controls-destroy':
+          break;
+      }
+    }).then(l => listener = l);
+
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.setActionHandler("play", () => {
+        ytPlayRef.current();
+        setIsPlayingRef.current(true);
+      });
+      navigator.mediaSession.setActionHandler("pause", () => {
+        ytPauseRef.current();
+        setIsPlayingRef.current(false);
+      });
+      navigator.mediaSession.setActionHandler("previoustrack", () => handlePrevRef.current());
+      navigator.mediaSession.setActionHandler("nexttrack", () => handleNextRef.current());
+    }
+
+    return () => {
+      if (listener) listener.remove();
+    };
+  }, []);
 
 
   // (Silent Audio handling consolidated into the main Wake Lock effect above)
@@ -593,7 +621,18 @@ function App() {
 
   // ─── Persistent System Notification (Secondary Controls) ───
   useEffect(() => {
-    if (!("Notification" in window) || Notification.permission !== "granted" || !currentSong) return;
+    if (!currentSong) return;
+
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSong.title,
+        artist: currentSong.artist || "MusicTube",
+        album: currentSong.album || "MusicTube",
+        artwork: [{ src: currentSong.thumbnail, sizes: '512x512', type: 'image/jpeg' }]
+      });
+    }
+
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
     
     const showSongNotification = async () => {
       const reg = await navigator.serviceWorker.ready;
