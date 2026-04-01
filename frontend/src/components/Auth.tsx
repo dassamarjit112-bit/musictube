@@ -145,7 +145,7 @@ export function Auth({ onLogin }: AuthProps) {
           email: sessionData.session.user.email,
           full_name: data.name,
           avatar_url: sessionData.session.user.user_metadata?.avatar_url || '',
-          subscription_tier: 'unknown' // App.tsx will fetch the real one in background sync
+          subscription_tier: 'free' // Force user to plans page
         });
       } else {
         // If not logged in, create new account

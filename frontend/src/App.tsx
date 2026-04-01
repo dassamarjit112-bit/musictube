@@ -34,7 +34,7 @@ const FALLBACK_THUMB = "https://images.unsplash.com/photo-1470225620780-dba8ba36
 const GUEST_USER = { id: 'guest', email: '', full_name: 'Guest', avatar_url: '', subscription_tier: 'free', isGuest: true };
 
 function App() {
-  const [view, setView] = useState<View>({ name: "home" }); // Default to home to show content immediately
+  const [view, setView] = useState<View>({ name: "account" }); // Force login page on entry
   const [homeData, setHomeData] = useState<HomeSection[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
