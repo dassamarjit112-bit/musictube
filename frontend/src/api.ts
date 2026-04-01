@@ -1,18 +1,19 @@
-// BASE API CONFIGuration
-// For local development on PC, use localhost:5000.
-// For production (Vercel), use relative /api.
+// 1. Enter your DEPLOYED backend URL here (e.g., Render, Railway, Vercel, etc.)
+// Make sure to include /api at the end if your backend routes are prefixed with it.
+const DEPLOYED_BACKEND_URL = "https://musictube-api-khwh.onrender.com/api";
+
+// 2. Automated logic to use local IP for development and Deployed URL for the APK
 const isLocal = window.location.hostname === "localhost" || 
-                /^127\./.test(window.location.hostname) || 
-                /^10\./.test(window.location.hostname) || 
-                /^172\.(1[6-9]|2[0-9]|3[01])\./.test(window.location.hostname) || 
-                /^192\.168\./.test(window.location.hostname);
+                window.location.hostname === "127.0.0.1";
 
-const isFlutter = (window as any).flutter_inappwebview !== undefined;
+// In Capacitor/APK, the hostname is usually 'localhost' or an internal scheme.
+// We force the deployed URL for the production APK.
+const BASE = isLocal 
+  ? `http://${window.location.hostname}:5000/api` 
+  : DEPLOYED_BACKEND_URL;
 
-// Use relative /api for typical web, but need explicit IP for Flutter APK
-const BASE = isFlutter
-  ? "http://192.168.1.3:5000/api" 
-  : (isLocal ? `http://${window.location.hostname}:5000/api` : "/api");
+// ... rest of your Song interfaces and api object ...
+
 
 export interface Song {
   type: "song" | "video";
