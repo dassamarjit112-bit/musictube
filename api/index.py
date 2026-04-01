@@ -124,6 +124,7 @@ def fmt_playlist(item):
 # ─── API ROUTES ──────────────────────────────────────────────────────────────
 
 @app.route("/api/search")
+@app.route("/search")
 def search():
     q = request.args.get("q", "")
     filter_type = request.args.get("filter", None)
@@ -147,6 +148,7 @@ def search():
         return jsonify({"results": [], "error": str(e)})
 
 @app.route("/api/home")
+@app.route("/home")
 def home():
     sections = []
     try:
@@ -182,6 +184,7 @@ def home():
     return jsonify({"sections": sections})
 
 @app.route("/api/charts")
+@app.route("/charts")
 def charts():
     country = request.args.get("country", "ZZ")
     try:
@@ -193,6 +196,7 @@ def charts():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/artist/<browse_id>")
+@app.route("/artist/<browse_id>")
 def artist(browse_id):
     try:
         data = yt.get_artist(browse_id)
@@ -216,6 +220,7 @@ def artist(browse_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/album/<browse_id>")
+@app.route("/album/<browse_id>")
 def album(browse_id):
     try:
         data = yt.get_album(browse_id)
@@ -232,6 +237,7 @@ def album(browse_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/playlist/<playlist_id>")
+@app.route("/playlist/<playlist_id>")
 def playlist(playlist_id):
     try:
         data = yt.get_playlist(playlist_id, limit=100)
@@ -245,6 +251,7 @@ def playlist(playlist_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/watch/<video_id>")
+@app.route("/watch/<video_id>")
 def watch(video_id):
     try:
         seen_ids = set()
@@ -281,6 +288,7 @@ def watch(video_id):
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/explore/moods")
+@app.route("/explore/moods")
 def moods():
     try:
         data = yt.get_mood_categories()
@@ -295,6 +303,7 @@ def moods():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/explore/mood")
+@app.route("/explore/mood")
 def mood_playlists():
     params = request.args.get("params", "")
     try:
@@ -305,6 +314,7 @@ def mood_playlists():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/explore/new_releases")
+@app.route("/explore/new_releases")
 def new_releases():
     try:
         data = yt.get_new_releases()

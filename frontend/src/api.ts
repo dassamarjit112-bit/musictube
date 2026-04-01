@@ -4,10 +4,11 @@ const VERCEL_URL = "https://sd-music-tube.vercel.app";
 
 // 2. Automated logic to choose between local and production
 const isLocal = window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1";
+  window.location.hostname === "127.0.0.1" ||
+  window.location.hostname.startsWith("192.168.") ||
+  window.location.hostname.startsWith("172.") ||
+  window.location.hostname.startsWith("10.");
 
-// For production (Vercel), we use relative '/api' or the explicit VERCEL_URL + '/api'
-// For development, we use the local flask server
 const BASE = isLocal
   ? `http://${window.location.hostname}:5000/api`
   : (VERCEL_URL ? `${VERCEL_URL}/api` : "/api");
