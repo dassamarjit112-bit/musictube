@@ -1,15 +1,15 @@
 // 1. Enter your VERCEL backend URL here (e.g., https://your-app.vercel.app)
 // Leave empty to use the current origin (recommended for Vercel monorepos)
-const VERCEL_URL = ""; 
+const VERCEL_URL = "https://sd-music-tube.vercel.app";
 
 // 2. Automated logic to choose between local and production
-const isLocal = window.location.hostname === "localhost" || 
-                window.location.hostname === "127.0.0.1";
+const isLocal = window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
 
 // For production (Vercel), we use relative '/api' or the explicit VERCEL_URL + '/api'
 // For development, we use the local flask server
-const BASE = isLocal 
-  ? `http://${window.location.hostname}:5000/api` 
+const BASE = isLocal
+  ? `http://${window.location.hostname}:5000/api`
   : (VERCEL_URL ? `${VERCEL_URL}/api` : "/api");
 
 // ... rest of your Song interfaces and api object ...
