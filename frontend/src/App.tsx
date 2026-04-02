@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { CapacitorMusicControls as MusicControls } from 'capacitor-music-controls';
+import { BackgroundPlayback } from './plugins/BackgroundPlayback';
 
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
@@ -101,10 +102,23 @@ function App() {
     window.addEventListener('online', hOnline);
     window.addEventListener('offline', hOffline);
 
-    // Request Notification permission at first visit
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
+    // Request Microphone and Notification permissions when entering the app
+    const setupPermissions = async () => {
+      // 1. Notification Permission
+      if ("Notification" in window && (Notification.permission === "default" || Notification.permission === "denied")) {
+        try { await Notification.requestPermission(); } catch (e) { }
+      }
+      // 2. Microphone (Record Audio) — trigger Android system dialog
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop()); // Stop immediately after getting permission
+        }
+      } catch (e) {
+        console.warn("Microphone permission denied:", e);
+      }
+    };
+    setupPermissions();
 
     return () => {
       window.removeEventListener('online', hOnline);
@@ -476,6 +490,14 @@ function App() {
     setDuration(0);
     logHistory(song);
 
+    // ─── Start/Update Native Background Service (KEEPS PROCESS ALIVE) ───
+    // This is the primary mechanism that prevents Android from killing the app
+    // when the screen turns off or the user switches to another app.
+    BackgroundPlayback.startService({
+      title:  song.title,
+      artist: song.artist || 'MusicTube',
+    }).catch(() => {});
+
     // ─── Initialize/Restart Silent Audio (CRITICAL FOR BACKGROUND PLAY) ───
     if (!silentAudioRef.current) {
       silentAudioRef.current = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+');
@@ -550,21 +572,19 @@ function App() {
     }
   }, [isPlaying, currentSong]);
 
-  // ─── Native Look Fix (Capacitor Music Controls) ───
+  // ─── Native Music Controls: create/update notification ────────────────────
   useEffect(() => {
     if (!currentSong) return;
 
-    // This creates the "Picture 2" Native Notification
     MusicControls.create({
       track: currentSong.title,
       artist: currentSong.artist || "MusicTube",
       cover: currentSong.thumbnail,
       isPlaying: isPlaying,
       dismissable: true,
-      hasPrev: true,      // Enables the Previous button
-      hasNext: true,      // Enables the Next button
+      hasPrev: true,
+      hasNext: true,
       hasClose: true,
-      // Android specific options
       ticker: 'Now playing ' + currentSong.title,
       playIcon: 'media_play',
       pauseIcon: 'media_pause',
@@ -572,13 +592,18 @@ function App() {
       nextIcon: 'media_next',
       closeIcon: 'media_close',
       notificationIcon: 'notification',
-      duration: isFinite(duration) ? duration : 0, // CRITICAL: Show duration in lock screen
+      duration: isFinite(duration) ? duration : 0,
       elapsed: isFinite(playedSeconds) ? playedSeconds : 0
     });
 
-    // Update the play/pause state in the notification tray
     MusicControls.updateIsPlaying({ isPlaying: isPlaying });
-  }, [currentSong, isPlaying]); 
+
+    // Also update the native background service notification text
+    BackgroundPlayback.updateMetadata({
+      title:  currentSong.title,
+      artist: currentSong.artist || 'MusicTube',
+    }).catch(() => {});
+  }, [currentSong, isPlaying]);
 
   // Global static native listeners
   useEffect(() => {
@@ -617,6 +642,26 @@ function App() {
       });
       navigator.mediaSession.setActionHandler("previoustrack", () => handlePrevRef.current());
       navigator.mediaSession.setActionHandler("nexttrack", () => handleNextRef.current());
+      
+      // New: Support lock-screen seeking / sliding the progress bar
+      navigator.mediaSession.setActionHandler("seekto", (details) => {
+        if (details.seekTime !== undefined) {
+          ytPlayer.seekTo(details.seekTime);
+          setPlayedSeconds(details.seekTime); // Instant UI feedback
+        }
+      });
+      navigator.mediaSession.setActionHandler("seekbackward", (details) => {
+        const offset = details.seekOffset || 10;
+        const target = Math.max(0, playedSeconds - offset);
+        ytPlayer.seekTo(target);
+        setPlayedSeconds(target);
+      });
+      navigator.mediaSession.setActionHandler("seekforward", (details) => {
+        const offset = details.seekOffset || 10;
+        const target = Math.min(duration, playedSeconds + offset);
+        ytPlayer.seekTo(target);
+        setPlayedSeconds(target);
+      });
     }
 
     return () => {

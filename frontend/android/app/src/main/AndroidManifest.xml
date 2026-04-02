@@ -35,18 +35,55 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <service android:name="com.capacitorjs.plugins.musiccontrols.MusicControlsService" 
-                 android:enabled="true" 
-                 android:exported="false"
-                 android:foregroundServiceType="mediaPlayback" />
+        <!--
+            MusicControlsService (from capacitor-music-controls-plugin)
+            stopWithTask="false" → service stays running when user swipes app from Recents.
+            This is the KEY flag that enables true background playback.
+        -->
+        <service
+            android:name="com.capacitorjs.plugins.musiccontrols.MusicControlsService"
+            android:enabled="true"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!--
+            Our custom MusicPlayerService:
+            - stopWithTask="false" → survives task removal (swipe from Recents)
+            - START_STICKY in onStartCommand → auto-restarts if OS kills it
+            - Holds WakeLock + AudioFocus to prevent audio interruption
+        -->
+        <service
+            android:name=".MusicPlayerService"
+            android:enabled="true"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="mediaPlayback" />
+
     </application>
 
-    <!-- Permissions -->
+    <!-- ── Permissions ─────────────────────────────────────────────────────── -->
 
-
+    <!-- Show media notification on Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Network access for streaming -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- CRITICAL: Keep CPU on during background playback -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Required to call startForegroundService() -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Required for foregroundServiceType="mediaPlayback" on API 34+ -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <!-- Access the microphone for search or voice features -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Control audio levels and handle interruptions -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
 </manifest>
