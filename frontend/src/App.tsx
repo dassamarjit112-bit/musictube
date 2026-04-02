@@ -619,6 +619,21 @@ function App() {
   // (Silent Audio handling consolidated into the main Wake Lock effect above)
 
 
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !currentSong) return;
+    if (duration > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: duration,
+          playbackRate: 1,
+          position: playedSeconds
+        });
+      } catch (e) {
+        console.warn("mediaSession.setPositionState failed:", e);
+      }
+    }
+  }, [currentSong, duration, playedSeconds]);
+
   // ─── Persistent System Notification (Secondary Controls) ───
   useEffect(() => {
     if (!currentSong) return;
@@ -2437,6 +2452,8 @@ function App() {
         src="data:audio/wav;base64,UklGRigAAABXQVZFav7//v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+/v7+" 
         loop 
         muted={false} 
+        preload="metadata"
+        playsInline
         style={{ display: 'none', position: 'absolute', opacity: 0 }} 
       />
     </div>
