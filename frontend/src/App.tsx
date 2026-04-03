@@ -561,13 +561,17 @@ function App() {
         try {
           const state = await BackgroundPlayback.getPlaybackState();
           // state is { isPlaying: boolean; position: number; duration: number }
-          if (state && state.duration > 0) {
+          if (state) {
             setDuration(state.duration);
             setPlayedSeconds(state.position);
-            setPlayed(state.position / state.duration);
+            if (state.duration > 0) {
+              setPlayed(state.position / state.duration);
+            } else {
+              setPlayed(0);
+            }
             
             // Sync with MediaSession if present
-            if ("mediaSession" in navigator) {
+            if ("mediaSession" in navigator && state.duration > 0) {
               navigator.mediaSession.setPositionState({
                  duration:     state.duration,
                  playbackRate: 1.0,
@@ -575,6 +579,7 @@ function App() {
               });
             }
           }
+
         } catch (e) {
           console.warn("Native progress check failed:", e);
         }

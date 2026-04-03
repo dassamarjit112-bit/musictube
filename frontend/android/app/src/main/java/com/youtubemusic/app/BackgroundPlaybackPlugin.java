@@ -98,7 +98,11 @@ public class BackgroundPlaybackPlugin extends Plugin {
         } else {
             ret.put("isPlaying", player.getPlayWhenReady());
             ret.put("position", (double)player.getCurrentPosition() / 1000.0);
-            ret.put("duration", (double)player.getDuration() / 1000.0);
+            long duration = player.getDuration();
+            if (duration < 0) {
+                duration = 0;
+            }
+            ret.put("duration", (double)duration / 1000.0);
         }
         call.resolve(ret);
     }
