@@ -551,6 +551,39 @@ function App() {
     ytPlayer.setVolume(isMuted ? 0 : volume);
   }, [volume, isMuted, ytPlayer]);
 
+  // ─── Native Progress Sync (Track progress of native ExoPlayer) ────────────────
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
+    
+    let interval: any = null;
+    if (isPlaying) {
+      interval = setInterval(async () => {
+        try {
+          const state = await BackgroundPlayback.getPlaybackState();
+          // state is { isPlaying: boolean; position: number; duration: number }
+          if (state && state.duration > 0) {
+            setDuration(state.duration);
+            setPlayedSeconds(state.position);
+            setPlayed(state.position / state.duration);
+            
+            // Sync with MediaSession if present
+            if ("mediaSession" in navigator) {
+              navigator.mediaSession.setPositionState({
+                 duration:     state.duration,
+                 playbackRate: 1.0,
+                 position:     state.position
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("Native progress check failed:", e);
+        }
+      }, 1000);
+    }
+
+    return () => { if (interval) clearInterval(interval); };
+  }, [isPlaying]);
+
   // ─── Unified Playback Controller (Cross-Platform) ───
   // This effect handles loading new songs AND syncing play/pause state
   useEffect(() => {
@@ -673,20 +706,32 @@ function App() {
       // New: Support lock-screen seeking / sliding the progress bar
       navigator.mediaSession.setActionHandler("seekto", (details) => {
         if (details.seekTime !== undefined) {
-          ytPlayer.seekTo(details.seekTime);
+          if (Capacitor.getPlatform() === 'android') {
+             BackgroundPlayback.seekTo({ position: details.seekTime });
+          } else {
+             ytPlayer.seekTo(details.seekTime);
+          }
           setPlayedSeconds(details.seekTime); // Instant UI feedback
         }
       });
       navigator.mediaSession.setActionHandler("seekbackward", (details) => {
         const offset = details.seekOffset || 10;
         const target = Math.max(0, playedSeconds - offset);
-        ytPlayer.seekTo(target);
+        if (Capacitor.getPlatform() === 'android') {
+           BackgroundPlayback.seekTo({ position: target });
+        } else {
+           ytPlayer.seekTo(target);
+        }
         setPlayedSeconds(target);
       });
       navigator.mediaSession.setActionHandler("seekforward", (details) => {
         const offset = details.seekOffset || 10;
         const target = Math.min(duration, playedSeconds + offset);
-        ytPlayer.seekTo(target);
+        if (Capacitor.getPlatform() === 'android') {
+           BackgroundPlayback.seekTo({ position: target });
+        } else {
+           ytPlayer.seekTo(target);
+        }
         setPlayedSeconds(target);
       });
     }
@@ -1294,7 +1339,15 @@ function App() {
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     setPlayed(val);
-    ytPlayer.seekTo(val);
+    
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      // For native, we need the total duration to calculate seconds
+      if (duration > 0) {
+        BackgroundPlayback.seekTo({ position: val * duration });
+      }
+    } else {
+      ytPlayer.seekTo(val);
+    }
   };
 
 

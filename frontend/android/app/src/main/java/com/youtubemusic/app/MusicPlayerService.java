@@ -21,6 +21,12 @@ import androidx.media3.session.MediaSessionService;
  */
 public class MusicPlayerService extends MediaSessionService {
 
+    // Static reference to the player so the Plugin can read current position/status
+    private static ExoPlayer staticPlayer;
+    public static ExoPlayer getStaticPlayer() {
+        return staticPlayer;
+    }
+
     private ExoPlayer player;
     private MediaSession mediaSession;
 
@@ -28,6 +34,7 @@ public class MusicPlayerService extends MediaSessionService {
     public void onCreate() {
         super.onCreate();
         initializePlayer();
+        staticPlayer = player;
     }
 
     private void initializePlayer() {
@@ -49,6 +56,13 @@ public class MusicPlayerService extends MediaSessionService {
     }
 
     /**
+     * Helper to get player instance for the plugin.
+     */
+    public ExoPlayer getPlayer() {
+        return player;
+    }
+
+    /**
      * Required by MediaSessionService to provide the session to external controllers
      * like the system's lock screen tray.
      */
@@ -64,29 +78,34 @@ public class MusicPlayerService extends MediaSessionService {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && player != null) {
-            String title  = intent.getStringExtra("title");
-            String artist = intent.getStringExtra("artist");
-            String url    = intent.getStringExtra("url"); // Final stream URL
             String action = intent.getStringExtra("action");
-
-            if ("play".equals(action) && url != null) {
-                MediaMetadata metadata = new MediaMetadata.Builder()
-                    .setTitle(title)
-                    .setArtist(artist)
-                    .build();
-                MediaItem item = new MediaItem.Builder()
-                    .setUri(url)
-                    .setMediaMetadata(metadata)
-                    .build();
-                player.setMediaItem(item);
-                player.prepare();
-                player.play();
+            
+            if ("play".equals(action)) {
+                String title  = intent.getStringExtra("title");
+                String artist = intent.getStringExtra("artist");
+                String url    = intent.getStringExtra("url");
+                if (url != null) {
+                    MediaMetadata metadata = new MediaMetadata.Builder()
+                        .setTitle(title)
+                        .setArtist(artist)
+                        .build();
+                    MediaItem item = new MediaItem.Builder()
+                        .setUri(url)
+                        .setMediaMetadata(metadata)
+                        .build();
+                    player.setMediaItem(item);
+                    player.prepare();
+                    player.play();
+                }
             } else if ("pause".equals(action)) {
                 player.pause();
             } else if ("resume".equals(action)) {
                 player.play();
             } else if ("stop".equals(action)) {
                 player.stop();
+            } else if ("seek".equals(action)) {
+                long positionMs = intent.getLongExtra("position", 0);
+                player.seekTo(positionMs);
             }
         }
         return super.onStartCommand(intent, flags, startId);

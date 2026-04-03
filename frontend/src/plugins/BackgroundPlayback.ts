@@ -23,16 +23,24 @@ export interface BackgroundPlaybackPlugin {
   
   /** Update metadata. */
   updateMetadata(options: { title: string; artist: string }): Promise<void>;
+
+  /** NEW: Get current playback position and duration. */
+  getPlaybackState(): Promise<{ isPlaying: boolean; position: number; duration: number }>;
+
+  /** NEW: Seek to a specific time (seconds). */
+  seekTo(options: { position: number }): Promise<void>;
 }
 
 // Web stub — all methods are no-ops when running outside Android
 const WebImpl: BackgroundPlaybackPlugin = {
-  startService:   async () => {},
-  playSong:       async () => {},
-  pause:          async () => {},
-  resume:         async () => {},
-  stopService:    async () => {},
-  updateMetadata: async () => {},
+  startService:     async () => {},
+  playSong:         async () => {},
+  pause:            async () => {},
+  resume:           async () => {},
+  stopService:      async () => {},
+  updateMetadata:   async () => {},
+  getPlaybackState: async () => ({ isPlaying: false, position: 0, duration: 0 }),
+  seekTo:           async () => {},
 };
 
 export const BackgroundPlayback = registerPlugin<BackgroundPlaybackPlugin>(

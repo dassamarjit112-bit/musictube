@@ -7,6 +7,7 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import androidx.media3.exoplayer.ExoPlayer;
 
 /**
  * BackgroundPlaybackPlugin
@@ -72,6 +73,37 @@ public class BackgroundPlaybackPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void seekTo(PluginCall call) {
+        Double position = call.getDouble("position"); // seconds
+        if (position == null) {
+            call.reject("Position is required");
+            return;
+        }
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "seek");
+        intent.putExtra("position", (long)(position * 1000)); // convert to ms
+        getContext().startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void getPlaybackState(PluginCall call) {
+        ExoPlayer player = MusicPlayerService.getStaticPlayer();
+        JSObject ret = new JSObject();
+        
+        if (player == null) {
+            ret.put("isPlaying", false);
+            ret.put("position", 0);
+            ret.put("duration", 0);
+        } else {
+            ret.put("isPlaying", player.getPlayWhenReady());
+            ret.put("position", (double)player.getCurrentPosition() / 1000.0);
+            ret.put("duration", (double)player.getDuration() / 1000.0);
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
     public void stopService(PluginCall call) {
         Intent intent = new Intent(getContext(), MusicPlayerService.class);
         getContext().stopService(intent);
@@ -80,8 +112,8 @@ public class BackgroundPlaybackPlugin extends Plugin {
 
     @PluginMethod
     public void updateMetadata(PluginCall call) {
-        // Media3 handles metadata automatically if the URL changes, 
-        // but this keeps the plugin consistent with the previous version.
+        // Media3 handles metadata automatically via the MediaItem, 
+        // but it's good to have this for future specific updates.
         call.resolve();
     }
 }

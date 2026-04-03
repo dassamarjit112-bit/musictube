@@ -1,8 +1,17 @@
+import { Capacitor } from '@capacitor/core';
+
 // Unified API Base URL
 // Locally, this hits the Vite proxy (localhost:5173/api -> localhost:5000/api)
 // In production, this hits Vercel's serverless routes (/api -> api/index.py)
-// If VITE_API_URL is set, it will hit that directly (e.g. for Capacitor Android app)
-const BASE = import.meta.env.VITE_API_URL || "/api";
+let BASE = import.meta.env.VITE_API_URL || "/api";
+
+// CRITICAL: On Android, "localhost" refers to the device. 
+// If BASE is still "/api" or "localhost", we need to point to the PC's actual IP.
+if (Capacitor.isNativePlatform() && (BASE === "/api" || BASE.includes("localhost"))) {
+  // If you are testing on a real device, you SHOULD set VITE_API_URL in .env to your PC IP!
+  // Fallback to a common emulator host IP if nothing else is set.
+  if (BASE === "/api") BASE = "http://10.0.2.2:5000/api";
+}
 
 
 export interface Song {
