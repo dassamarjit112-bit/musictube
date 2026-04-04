@@ -647,36 +647,35 @@ function App() {
        }
     }
 
-    // ─── UNIFIED PLAYBACK CONTROLLER (NATIVE-FIRST ON ANDROID) ───
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+    // ─── HYBRID PLAYBACK CONTROLLER: Webview for UI, Native for Background ───
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' && !isAppActiveRef.current) {
        if (isPlaying) {
          BackgroundPlayback.resume().catch(() => {});
        } else {
          BackgroundPlayback.pause().catch(() => {});
        }
-       // Since native handles audio, we skip the Webview IFrame sync below
-    } else {
-        const player = ytPlayer.player;
-        const playerState = player?.getPlayerState?.();
+    }
 
-        if (staticCurrentSongId.current !== currentSong.videoId) {
-          staticCurrentSongId.current = currentSong.videoId;
-          setPlayerError(null);
-          ytPlayer.load(currentSong.videoId);
-          return;
-        }
+    const player = ytPlayer.player;
+    const playerState = player?.getPlayerState?.();
 
-        if (player) {
-          if (isPlaying) {
-            if (playerState === 2 || playerState === 0 || playerState === 5 || playerState === -1) {
-              ytPlayer.play();
-            }
-          } else {
-            if (playerState === 1 || playerState === 3) {
-              ytPlayer.pause();
-            }
-          }
+    if (staticCurrentSongId.current !== currentSong.videoId) {
+      staticCurrentSongId.current = currentSong.videoId;
+      setPlayerError(null);
+      ytPlayer.load(currentSong.videoId);
+      return;
+    }
+
+    if (player) {
+      if (isPlaying) {
+        if (playerState === 2 || playerState === 0 || playerState === 5 || playerState === -1) {
+          ytPlayer.play();
         }
+      } else {
+        if (playerState === 1 || playerState === 3) {
+          ytPlayer.pause();
+        }
+      }
     }
   }, [isPlaying, currentSong]);
 
