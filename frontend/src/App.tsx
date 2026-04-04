@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { CapacitorMusicControls as MusicControls } from 'capacitor-music-controls';
-import { BackgroundPlayback } from './plugins/BackgroundPlayback';
 
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
@@ -494,31 +493,7 @@ function App() {
     setDuration(0);
     logHistory(song);
 
-    // ─── Native ExoPlayer Dispatch (Android) ───
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
-      currentStreamUrlRef.current = ""; // Reset for new song
-      // Cache stream URL securely without triggering IP block immediately.
-      // This will be ready when the app goes to the background.
-      api.stream(song.videoId).then(res => {
-         if (res.url) {
-           currentStreamUrlRef.current = res.url;
-           // TRIGGER NATIVE PLAY IMMEDIATELY ONCE URL ARRIVES
-           BackgroundPlayback.playSong({
-             title:  song.title,
-             artist: song.artist || 'MusicTube',
-             url:    res.url,
-             imageUrl: song.thumbnail,
-             duration: duration // pass duration if we have it or let native find it
-           }).catch(() => {});
-         }
-      }).catch(e => console.warn("Background stream prep failed:", e));
 
-      // Keep process alive for Webview
-      BackgroundPlayback.startService({
-        title:  song.title,
-        artist: song.artist || 'MusicTube',
-      }).catch(() => {});
-    }
 
     // ─── Smart Queue Building ───
     if (songList && songList.length >= 5) {
@@ -549,74 +524,7 @@ function App() {
     return () => document.removeEventListener('visibilitychange', handleVisible);
   }, [isPlaying, ytPlayer]);
 
-  // ─── BACKGROUND HANDOFF ───
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return;
-    
-    // Add real-time listener for native player updates
-    const nativeListener = BackgroundPlayback.addListener('onPlayerUpdate', (data) => {
-      // console.log("Native Player Update:", data.type, data.message);
-      if (data.type === 'trackTransition') {
-        if (data.message === 'skipNext') {
-            handleNextRef.current();
-        } else if (data.message === 'skipPrev') {
-            handlePrevRef.current();
-        } else {
-            handleNextRef.current(); // default
-        }
-      } else if (data.type === 'positionUpdate') {
-         // Real-time progress sync from native service
-         if (data.position && data.position > 0) {
-            setPlayedSeconds(data.position);
-         }
-         if (data.duration && data.duration > 0 && !isFinite(duration)) {
-            setDuration(data.duration);
-         }
-      } else if (data.type === 'playerError') {
-        setPlayerError(`Native Playback Error: ${data.message}`);
-      }
-    });
 
-    const stateListener = CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
-      if (!currentSongRef.current) return;
-      
-      if (!isActive) {
-        // APP CLOSED/BACKGROUNDED -> Hand off to Native ExoPlayer
-        if (ytPlayer.player && typeof ytPlayer.player.getCurrentTime === 'function') {
-          const currentTime = ytPlayer.player.getCurrentTime() || 0;
-          ytPlayer.pause();
-          
-          if (currentStreamUrlRef.current && isPlaying) {
-            BackgroundPlayback.playSong({
-              title: currentSongRef.current.title,
-              artist: currentSongRef.current.artist || 'MusicTube',
-              url: currentStreamUrlRef.current,
-              imageUrl: currentSongRef.current.thumbnail
-            }).then(() => {
-              BackgroundPlayback.seekTo({ position: currentTime });
-            }).catch(() => {});
-          }
-        }
-      } else {
-        // APP OPENED/FOREGROUNDED -> Hand off back to WebView
-        const nativeState = await BackgroundPlayback.getPlaybackState().catch(() => null);
-        
-        if (nativeState && nativeState.position > 0) {
-          ytPlayer.seekTo(nativeState.position);
-          // Only pause native if we are successfully playing in webview
-          BackgroundPlayback.pause().catch(() => {});
-        }
-        if (isPlaying) {
-          ytPlayer.play();
-        }
-      }
-    });
-
-    return () => { 
-      stateListener.then(l => l.remove());
-      nativeListener.then(l => l.remove());
-    };
-  }, [isPlaying, ytPlayer]);
 
   // Volume sync
   useEffect(() => {
@@ -635,26 +543,6 @@ function App() {
   // This effect handles loading new songs AND syncing play/pause state
   useEffect(() => {
     if (!currentSong?.videoId) return;
-
-    // 1. Sync Native Background State (Android)
-    // ONLY sync if app is NOT in foreground (Active) or if it's already playing natively.
-    // If we call resume() while in foreground, it can steal focus from the WebView player.
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' && !isAppActiveRef.current) {
-       if (isPlaying) {
-         BackgroundPlayback.resume().catch(() => {});
-       } else {
-         BackgroundPlayback.pause().catch(() => {});
-       }
-    }
-
-    // ─── HYBRID PLAYBACK CONTROLLER: Webview for UI, Native for Background ───
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' && !isAppActiveRef.current) {
-       if (isPlaying) {
-         BackgroundPlayback.resume().catch(() => {});
-       } else {
-         BackgroundPlayback.pause().catch(() => {});
-       }
-    }
 
     const player = ytPlayer.player;
     const playerState = player?.getPlayerState?.();
@@ -679,34 +567,41 @@ function App() {
     }
   }, [isPlaying, currentSong]);
 
-
   useEffect(() => {
     if (!currentSong) return;
 
-    // Use CapacitorMusicControls as a secondary UI bridge for the notification shade
-    // while the BackgroundPlayback service handles the actual audio process.
+    // Create the background media session for lock screen controls
     MusicControls.create({
       track: currentSong.title,
       artist: currentSong.artist || "MusicTube",
       cover: currentSong.thumbnail,
       isPlaying: isPlaying,
-      dismissable: true,
+      dismissable: false, // Make it persistent like NouTube
       hasPrev: true,
       hasNext: true,
-      hasClose: true,
+      hasClose: false,
       ticker: 'Now playing ' + currentSong.title,
       playIcon: 'media_play',
       pauseIcon: 'media_pause',
       prevIcon: 'media_prev',
       nextIcon: 'media_next',
       closeIcon: 'media_close',
-      notificationIcon: 'notification',
+      notificationIcon: 'notification', // must match a drawable in android/app/src/main/res/drawable
       duration: isFinite(duration) ? duration : 0,
       elapsed: isFinite(playedSeconds) ? playedSeconds : 0
     }).catch(() => {});
 
+  }, [currentSong]); // Only recreate when the song changes
+
+  useEffect(() => {
     MusicControls.updateIsPlaying({ isPlaying: isPlaying });
-  }, [currentSong, isPlaying, duration]);
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (isFinite(playedSeconds) && playedSeconds > 0) {
+      MusicControls.updateElapsed({ elapsed: playedSeconds, isPlaying: isPlaying });
+    }
+  }, [playedSeconds]); // Update progress bar natively when web scrubber moves
 
   // Global static native listeners
   useEffect(() => {

@@ -48,22 +48,6 @@
             android:stopWithTask="false"
             android:foregroundServiceType="mediaPlayback" />
 
-        <!--
-            Our custom MusicPlayerService:
-            - stopWithTask="false" → survives task removal (swipe from Recents)
-            - START_STICKY in onStartCommand → auto-restarts if OS kills it
-            - Holds WakeLock + AudioFocus to prevent audio interruption
-        -->
-        <service
-            android:name=".MusicPlayerService"
-            android:enabled="true"
-            android:exported="true"
-            android:stopWithTask="false"
-            android:foregroundServiceType="mediaPlayback">
-            <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
-            </intent-filter>
-        </service>
 
     </application>
 

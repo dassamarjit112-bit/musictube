@@ -20,9 +20,6 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // Register our custom Capacitor plugin BEFORE super.onCreate()
-        registerPlugin(BackgroundPlaybackPlugin.class);
-        
         // Force hardware volume buttons to control media volume
         setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
         
