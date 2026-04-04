@@ -22,20 +22,31 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // Register our custom Capacitor plugin BEFORE super.onCreate()
         registerPlugin(BackgroundPlaybackPlugin.class);
-        // Force hardware volume buttons to control media volume even if WebView audio isn't detected yet
+        
+        // Force hardware volume buttons to control media volume
         setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
+        
         super.onCreate(savedInstanceState);
-    }
-
-    @Override
-    public void onStart() {
-        super.onStart();
+        
+        // Apply WebView settings immediately after bridge creation
         WebView webView = getBridge().getWebView();
         if (webView != null) {
             WebSettings s = webView.getSettings();
             s.setMediaPlaybackRequiresUserGesture(false);
             s.setJavaScriptEnabled(true);
             s.setDomStorageEnabled(true);
+            s.setDatabaseEnabled(true);
+            s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        }
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        // Keep settings updated in onStart as well
+        WebView webView = getBridge().getWebView();
+        if (webView != null) {
+            webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
         }
     }
 

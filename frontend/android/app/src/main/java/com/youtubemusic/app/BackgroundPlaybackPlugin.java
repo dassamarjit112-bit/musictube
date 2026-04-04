@@ -35,6 +35,7 @@ public class BackgroundPlaybackPlugin extends Plugin {
         String title  = call.getString("title",  "MusicTube");
         String artist = call.getString("artist", "Playing…");
         String url    = call.getString("url"); // Final stream URL
+        String imageUrl = call.getString("imageUrl"); // Artwork URL
 
         if (url == null || url.isEmpty()) {
             call.reject("URL is required for native playback");
@@ -46,6 +47,7 @@ public class BackgroundPlaybackPlugin extends Plugin {
         intent.putExtra("title",  title);
         intent.putExtra("artist", artist);
         intent.putExtra("url",    url);
+        intent.putExtra("imageUrl", imageUrl);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getContext().startForegroundService(intent);

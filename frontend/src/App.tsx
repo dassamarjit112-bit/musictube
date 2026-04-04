@@ -558,7 +558,8 @@ function App() {
             BackgroundPlayback.playSong({
               title: currentSongRef.current.title,
               artist: currentSongRef.current.artist || 'MusicTube',
-              url: currentStreamUrlRef.current
+              url: currentStreamUrlRef.current,
+              imageUrl: currentSongRef.current.thumbnail
             }).then(() => {
               // Immediately seek native player to current time
               BackgroundPlayback.seekTo({ position: currentTime });
@@ -587,13 +588,23 @@ function App() {
     ytPlayer.setVolume(isMuted ? 0 : volume);
   }, [volume, isMuted, ytPlayer]);
 
+  const isAppActiveRef = useRef(true);
+  useEffect(() => {
+    const sub = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      isAppActiveRef.current = isActive;
+    });
+    return () => { sub.then(l => l.remove()); };
+  }, []);
+
   // ─── Unified Playback Controller (Cross-Platform) ───
   // This effect handles loading new songs AND syncing play/pause state
   useEffect(() => {
     if (!currentSong?.videoId) return;
 
     // 1. Sync Native Background State (Android)
-    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+    // ONLY sync if app is NOT in foreground (Active) or if it's already playing natively.
+    // If we call resume() while in foreground, it can steal focus from the WebView player.
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' && !isAppActiveRef.current) {
        if (isPlaying) {
          BackgroundPlayback.resume().catch(() => {});
        } else {
