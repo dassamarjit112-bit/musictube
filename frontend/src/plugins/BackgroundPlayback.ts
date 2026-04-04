@@ -8,7 +8,7 @@ export interface BackgroundPlaybackPlugin {
   startService(options: { title: string; artist: string }): Promise<void>;
 
   /** Play/Update the native ExoPlayer. */
-  playSong(options: { title: string; artist: string; url: string; imageUrl?: string }): Promise<void>;
+  playSong(options: { title: string; artist: string; url: string; imageUrl?: string; duration?: number }): Promise<void>;
   
   /** Pause native playback. */
   pause(): Promise<void>;

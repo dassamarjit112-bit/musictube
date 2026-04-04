@@ -131,9 +131,12 @@ public class MusicPlayerService extends MediaSessionService {
                 public int onPlayerCommandRequest(MediaSession session, MediaSession.ControllerInfo controller, int command) {
                     if (command == Player.COMMAND_SEEK_TO_NEXT || command == Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM) {
                         broadcastEvent("trackTransition", "skipNext");
+                        return MediaSession.Callback.super.onPlayerCommandRequest(session, controller, command);
                     } else if (command == Player.COMMAND_SEEK_TO_PREVIOUS || command == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM) {
                         broadcastEvent("trackTransition", "skipPrev");
+                        return MediaSession.Callback.super.onPlayerCommandRequest(session, controller, command);
                     }
+                    // Explicitly allow all seek and transport commands
                     return MediaSession.Callback.super.onPlayerCommandRequest(session, controller, command);
                 }
             })
@@ -218,16 +221,25 @@ public class MusicPlayerService extends MediaSessionService {
         String title = intent.getStringExtra("title");
         String artist = intent.getStringExtra("artist");
         String url = intent.getStringExtra("url");
+        long duration = intent.getLongExtra("duration", 0);
         
-        MediaMetadata metadata = new MediaMetadata.Builder()
+        MediaMetadata.Builder metadataBuilder = new MediaMetadata.Builder()
             .setTitle(title)
-            .setArtist(artist)
-            .build();
+            .setArtist(artist);
+            
+        // Prime the system player with the duration if we have it from JS
+        // This stops the "0:00" problem before the stream buffers
+        Bundle extras = new Bundle();
+        if (duration > 0) {
+            // Media3 uses duration natively from the player state, 
+            // but we can set it in extras for some metadata providers
+            extras.putLong("duration", duration);
+        }
 
         return new MediaItem.Builder()
             .setUri(url)
             .setMediaId(url)
-            .setMediaMetadata(metadata)
+            .setMediaMetadata(metadataBuilder.build())
             .build();
     }
 

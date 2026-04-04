@@ -507,7 +507,8 @@ function App() {
              title:  song.title,
              artist: song.artist || 'MusicTube',
              url:    res.url,
-             imageUrl: song.thumbnail
+             imageUrl: song.thumbnail,
+             duration: duration // pass duration if we have it or let native find it
            }).catch(() => {});
          }
       }).catch(e => console.warn("Background stream prep failed:", e));

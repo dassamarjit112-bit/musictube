@@ -58,6 +58,7 @@ public class BackgroundPlaybackPlugin extends Plugin {
         intent.putExtra("artist", artist);
         intent.putExtra("url",    url);
         intent.putExtra("imageUrl", imageUrl);
+        intent.putExtra("duration", (long)(call.getDouble("duration", 0.0) * 1000));
 
         getContext().startService(intent);
         call.resolve();
