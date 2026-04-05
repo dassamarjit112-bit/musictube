@@ -1,19 +1,13 @@
 package com.youtubemusic.app;
 
 import android.content.Intent;
-import android.os.Build;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.common.Player;
 
-/**
- * BackgroundPlaybackPlugin
- * Capacitor bridge for the Native ExoPlayer engine.
- * Emits 'onPlayerUpdate' events to JavaScript.
- */
 @CapacitorPlugin(name = "BackgroundPlayback")
 public class BackgroundPlaybackPlugin extends Plugin {
 
@@ -32,57 +26,20 @@ public class BackgroundPlaybackPlugin extends Plugin {
     @PluginMethod
     public void startService(PluginCall call) {
         Intent intent = new Intent(getContext(), MusicPlayerService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            getContext().startForegroundService(intent);
-        } else {
-            getContext().startService(intent);
-        }
-        call.resolve();
-    }
-
-    @PluginMethod
-    public void playSong(PluginCall call) {
-        String title  = call.getString("title",  "MusicTube");
-        String artist = call.getString("artist", "Playing…");
-        String url    = call.getString("url");
-        String imageUrl = call.getString("imageUrl");
-
-        if (url == null || url.isEmpty()) {
-            call.reject("URL is required");
-            return;
-        }
-
-        Intent intent = new Intent(getContext(), MusicPlayerService.class);
-        intent.putExtra("action", "play");
-        intent.putExtra("title",  title);
-        intent.putExtra("artist", artist);
-        intent.putExtra("url",    url);
-        intent.putExtra("imageUrl", imageUrl);
-        intent.putExtra("duration", (long)(call.getDouble("duration", 0.0) * 1000));
-
         getContext().startService(intent);
         call.resolve();
     }
 
     @PluginMethod
-    public void addNextTrack(PluginCall call) {
-        String title  = call.getString("title",  "MusicTube");
-        String artist = call.getString("artist", "Playing…");
-        String url    = call.getString("url");
-        String imageUrl = call.getString("imageUrl");
-
-        if (url == null || url.isEmpty()) {
-            call.reject("URL is required");
-            return;
-        }
-
+    public void playSong(PluginCall call) {
         Intent intent = new Intent(getContext(), MusicPlayerService.class);
-        intent.putExtra("action", "addNext");
-        intent.putExtra("title",  title);
-        intent.putExtra("artist", artist);
-        intent.putExtra("url",    url);
-        intent.putExtra("imageUrl", imageUrl);
-        
+        intent.putExtra("action", "play");
+        intent.putExtra("title",  call.getString("title", "MusicTube"));
+        intent.putExtra("artist", call.getString("artist", "Playing…"));
+        intent.putExtra("url",    call.getString("url"));
+        intent.putExtra("videoId", call.getString("videoId"));
+        intent.putExtra("imageUrl", call.getString("imageUrl"));
+        intent.putExtra("duration", (long)(call.getDouble("duration", 0.0) * 1000));
         getContext().startService(intent);
         call.resolve();
     }
@@ -96,14 +53,6 @@ public class BackgroundPlaybackPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void resume(PluginCall call) {
-        Intent intent = new Intent(getContext(), MusicPlayerService.class);
-        intent.putExtra("action", "resume");
-        getContext().startService(intent);
-        call.resolve();
-    }
-
-    @PluginMethod
     public void next(PluginCall call) {
         Intent intent = new Intent(getContext(), MusicPlayerService.class);
         intent.putExtra("action", "next");
@@ -112,54 +61,13 @@ public class BackgroundPlaybackPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void previous(PluginCall call) {
-        Intent intent = new Intent(getContext(), MusicPlayerService.class);
-        intent.putExtra("action", "previous");
-        getContext().startService(intent);
-        call.resolve();
-    }
-
-    @PluginMethod
-    public void seekTo(PluginCall call) {
-        Double position = call.getDouble("position");
-        if (position == null) {
-            call.reject("Position required");
-            return;
-        }
-        Intent intent = new Intent(getContext(), MusicPlayerService.class);
-        intent.putExtra("action", "seek");
-        intent.putExtra("position", (long)(position * 1000));
-        getContext().startService(intent);
-        call.resolve();
-    }
-
-    @PluginMethod
-    public void getPlaybackState(PluginCall call) {
-        ExoPlayer player = MusicPlayerService.getStaticPlayer();
-        JSObject ret = new JSObject();
-        if (player == null) {
-            ret.put("isPlaying", false);
-            ret.put("position", 0);
-            ret.put("duration", 0);
-        } else {
-            ret.put("isPlaying", player.getPlayWhenReady());
-            ret.put("position", (double)player.getCurrentPosition() / 1000.0);
-            long duration = player.getDuration();
-            ret.put("duration", (double)(duration < 0 ? 0 : duration) / 1000.0);
-        }
-        call.resolve(ret);
-    }
-
-    @PluginMethod
-    public void stopService(PluginCall call) {
-        Intent intent = new Intent(getContext(), MusicPlayerService.class);
-        getContext().stopService(intent);
-        call.resolve();
-    }
-
-    @PluginMethod
     public void updateMetadata(PluginCall call) {
-        // Handled via playSong usually, but kept for future use.
+        Intent intent = new Intent(getContext(), MusicPlayerService.class);
+        intent.putExtra("action", "updateMetadata");
+        intent.putExtra("title", call.getString("title"));
+        intent.putExtra("artist", call.getString("artist"));
+        intent.putExtra("duration", (long)(call.getDouble("duration", 0.0) * 1000));
+        getContext().startService(intent);
         call.resolve();
     }
 

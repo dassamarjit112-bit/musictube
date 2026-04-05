@@ -37,17 +37,19 @@
         </provider>
 
         <!--
-            MusicControlsService (from capacitor-music-controls-plugin)
-            stopWithTask="false" → service stays running when user swipes app from Recents.
-            This is the KEY flag that enables true background playback.
+            MusicPlayerService (Custom Media3 implementation)
+            This service handles background playback and media session.
         -->
         <service
-            android:name="com.capacitorjs.plugins.musiccontrols.MusicControlsService"
+            android:name=".MusicPlayerService"
             android:enabled="true"
-            android:exported="false"
-            android:stopWithTask="false"
-            android:foregroundServiceType="mediaPlayback" />
-
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
 
     </application>
 

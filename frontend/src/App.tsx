@@ -272,6 +272,9 @@ function App() {
   const setIsPlayingRef = useRef<any>(null);
   const repeatModeRef = useRef(repeatMode);
   const isShuffleRef = useRef(isShuffle);
+  // Guard: set to true when playSong() starts native playback so the
+  // isPlaying effect doesn't also fire BackgroundPlayback.resume() immediately after.
+  const isNativePlayingRef = useRef(false);
   repeatModeRef.current = repeatMode;
   isShuffleRef.current = isShuffle;
   setIsPlayingRef.current = setIsPlaying;
@@ -515,16 +518,25 @@ function App() {
       if (Capacitor.isNativePlatform()) {
         const { url: streamUrl } = await api.stream(song.videoId);
         if (streamUrl) {
+          const durationParts = song.duration.split(':').map(Number);
+          let durationSeconds = 0;
+          if (durationParts.length === 2) durationSeconds = durationParts[0] * 60 + durationParts[1];
+          else if (durationParts.length === 3) durationSeconds = durationParts[0] * 3600 + durationParts[1] * 60 + durationParts[2];
+
+          // Mark so the isPlaying effect skips the redundant resume() call
+          isNativePlayingRef.current = true;
+
           await BackgroundPlayback.playSong({
             title: song.title,
             artist: song.artist,
             url: streamUrl,
             imageUrl: song.thumbnail,
-            duration: parseInt(song.duration) || 0
+            duration: durationSeconds || 0
           });
         }
       }
     } catch (e) {
+      isNativePlayingRef.current = false;
       console.warn("Native playback failed to start:", e);
     }
   };
@@ -578,7 +590,12 @@ function App() {
         if (playerState === 2 || playerState === 0 || playerState === 5 || playerState === -1) {
           ytPlayer.play();
         }
-        if (Capacitor.isNativePlatform()) BackgroundPlayback.resume();
+        // Only tell native to resume if we didn't just call playSong (which already starts)
+        // playSong sets isNativePlayingRef=true. We skip resume() in that case.
+        if (Capacitor.isNativePlatform() && !isNativePlayingRef.current) {
+          BackgroundPlayback.resume();
+        }
+        isNativePlayingRef.current = false;
       } else {
         if (playerState === 1 || playerState === 3) {
           ytPlayer.pause();
@@ -623,6 +640,41 @@ function App() {
       MusicControls.updateElapsed({ elapsed: playedSeconds, isPlaying: isPlaying });
     }
   }, [playedSeconds]); // Update progress bar natively when web scrubber moves
+
+  // ─── Native ExoPlayer event listener (Android only) ───────────────────
+  // Wires: Next/Prev buttons, play state sync, and position/duration updates
+  // from the MusicPlayerService back into the React state.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let nativeListener: any = null;
+    BackgroundPlayback.addListener('onPlayerUpdate', (data: any) => {
+      if (!data || !data.type) return;
+      switch (data.type) {
+        case 'trackTransition':
+          if (data.message === 'skipNext') handleNextRef.current();
+          else if (data.message === 'skipPrev') handlePrevRef.current();
+          break;
+        case 'isPlayingChanged':
+          // Sync JS isPlaying with the native player's state
+          setIsPlayingRef.current(data.isPlaying);
+          break;
+        case 'positionUpdate':
+          if (typeof data.position === 'number' && isFinite(data.position)) {
+            setPlayedSeconds(data.position);
+            if (data.duration > 0) setPlayed(data.position / data.duration);
+          }
+          if (typeof data.duration === 'number' && data.duration > 0) {
+            setDuration(data.duration);
+          }
+          break;
+        case 'playerError':
+          console.error('Native player error:', data.message);
+          break;
+      }
+    }).then((l: any) => nativeListener = l);
+
+    return () => { if (nativeListener) nativeListener.remove(); };
+  }, []);
 
   // Global static native listeners
   useEffect(() => {
