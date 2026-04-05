@@ -7,6 +7,9 @@ export interface BackgroundPlaybackPlugin {
   /** Start/Update the Android Service (Legacy). */
   startService(options: { title: string; artist: string }): Promise<void>;
 
+  /** Update metadata on the native media session (notification / lock screen). */
+  updateMetadata(options: { title: string; artist: string; duration?: number; position?: number; imageUrl?: string }): Promise<void>;
+
   /** Play/Update the native ExoPlayer. */
   playSong(options: { title: string; artist: string; url: string; imageUrl?: string; duration?: number }): Promise<void>;
   
@@ -56,6 +59,7 @@ const WebImpl: any = {
   previous:         async () => {},
   seekTo:           async () => {},
   getPlaybackState: async () => ({ isPlaying: false, position: 0, duration: 0 }),
+  updateMetadata:   async () => {},
   stopService:      async () => {},
   addListener:      async () => ({ remove: async () => {} }),
 };

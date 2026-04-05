@@ -257,6 +257,31 @@ function App() {
     }
   }, [isPlaying]);
 
+  // ─── Bridge: Web Player → Native Capacitor Plugin Metadata Sync ───
+  // When the web player starts playing or when duration resolves,
+  // push the current track metadata + position to the native media session.
+  useEffect(() => {
+    if (!currentSong || !isPlaying) return;
+    if (!Capacitor.isNativePlatform()) return;
+
+    // Update native notification / lock-screen with current track info
+    BackgroundPlayback.updateMetadata({
+      title: currentSong.title,
+      artist: currentSong.artist || 'MusicTube',
+      duration: isFinite(duration) ? duration : 0,
+      position: isFinite(playedSeconds) ? playedSeconds : 0,
+      imageUrl: currentSong.thumbnail,
+    }).catch((e) =>
+      console.warn('BackgroundPlayback.updateMetadata failed:', e)
+    );
+
+    // Also keep the browser's own mediaSession state in sync
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'playing';
+    }
+  }, [isPlaying, currentSong, duration]);
+  //   ↑ fires when play state changes, song changes, or duration resolves
+
   const currentSongRef = useRef(currentSong);
   currentSongRef.current = currentSong;
   const isPlayingRef = useRef(isPlaying);
