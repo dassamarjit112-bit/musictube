@@ -323,8 +323,8 @@ body {
 }
 
 .main-header {
-  height: 52px;
-  padding: 0 16px;
+  height: auto; min-height: 64px;
+  padding: calc(12px + env(safe-area-inset-top, 24px)) 16px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1950,8 +1950,8 @@ body {
   .main-header {
     background: rgba(3, 3, 3, 0.85);
     backdrop-filter: blur(20px);
-    padding: 0 16px;
-    height: 64px;
+    padding: calc(16px + env(safe-area-inset-top, 32px)) 16px 16px;
+    height: auto;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     position: sticky;
     top: 0;
